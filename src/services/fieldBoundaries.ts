@@ -113,6 +113,31 @@ function rowGeometry(row: Record<string, unknown>): Polygon | MultiPolygon | nul
   return null
 }
 
+function sanitizeProperty(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString()
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) return undefined
+  if (Array.isArray(value)) return value.map(sanitizeProperty).filter(v => v !== undefined)
+  if (value && typeof value === 'object') {
+    const cleaned: Record<string, unknown> = {}
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      const sanitized = sanitizeProperty(nestedValue)
+      if (sanitized !== undefined) cleaned[key] = sanitized
+    }
+    return cleaned
+  }
+  return value
+}
+
+function sanitizeProperties(row: Record<string, unknown>, fieldId: string): Record<string, unknown> & { fieldId: string } {
+  const properties: Record<string, unknown> & { fieldId: string } = { fieldId }
+  for (const [key, value] of Object.entries(row)) {
+    if (GEOMETRY_COLUMNS.includes(key)) continue
+    const sanitized = sanitizeProperty(value)
+    if (sanitized !== undefined) properties[key] = sanitized
+  }
+  return properties
+}
+
 function featureId(row: Record<string, unknown>, index: number): string {
   for (const key of ['field_id', 'fieldId', 'id', 'ID', 'fid']) {
     const value = row[key]
@@ -159,8 +184,7 @@ async function loadFields(): Promise<FeatureCollection<Polygon | MultiPolygon>> 
   rows.forEach((row, index) => {
     const geometry = rowGeometry(row)
     if (!geometry) return
-    const properties = { ...row, fieldId: featureId(row, index) }
-    for (const column of GEOMETRY_COLUMNS) delete properties[column]
+    const properties = sanitizeProperties(row, featureId(row, index))
     features.push({ type: 'Feature', geometry, properties })
   })
   if (!features.length) throw new Error('No polygon geometries were found in the field parquet')

@@ -3,9 +3,10 @@
     <header class="topbar">
       <div class="brand" aria-label="Crops of Magnolia">
         <svg viewBox="0 0 32 32" aria-hidden="true">
-          <circle cx="16" cy="16" r="6.5" fill="var(--accent)" />
-          <ellipse cx="16" cy="16" rx="13.5" ry="6" stroke="var(--accent)" stroke-width="1.6" opacity=".82" transform="rotate(-28 16 16)" />
-          <circle cx="27" cy="9.5" r="1.8" fill="var(--accent-2)" />
+          <path d="M16 27V10" stroke="var(--accent-2)" stroke-width="2.2" stroke-linecap="round" />
+          <path d="M15.8 14.5C9.2 14.2 5.2 10.1 5 5.3c5.7-.4 10.3 2.6 11.7 8.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M17 18.5c6.4.2 10.1-3.6 10.4-8.2-5.6-.5-9.9 2.2-11.3 7.4" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M9 27h14" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" />
         </svg>
         <div class="brand-title">Crops of Magnolia</div>
       </div>
@@ -109,7 +110,7 @@
 
     <main class="map-stage">
       <div ref="mapEl" class="map"></div>
-      <div v-if="!inspectorOpen" class="map-hint">Click anywhere on the map to analyze a Sentinel-2 time series</div>
+      <div v-if="!inspectorOpen" class="map-hint">Click in any field to analyze NDVI timeseries from Sentinel-2 satellite</div>
 
       <div class="basemap-switcher">
         <button

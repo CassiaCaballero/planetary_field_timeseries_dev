@@ -78,10 +78,15 @@ async function fetchItemFieldBands(item: any, field: FieldFeature, collection: s
   for (const band of BAND_NAMES) params.append('assets', band)
 
   const url = `${PC_TILER_BASE}/item/statistics?${params.toString()}`
-  const collectionBody: FeatureCollection = { type: 'FeatureCollection', features: [field] }
+  const safeField: FieldFeature = {
+    type: 'Feature',
+    geometry: field.geometry,
+    properties: { fieldId: field.properties.fieldId },
+  }
+  const collectionBody: FeatureCollection = { type: 'FeatureCollection', features: [safeField] }
 
   return await postStatistics(url, collectionBody)
-    ?? await postStatistics(url, field)
+    ?? await postStatistics(url, safeField)
 }
 
 function centroid(field: FieldFeature): [number, number] {
