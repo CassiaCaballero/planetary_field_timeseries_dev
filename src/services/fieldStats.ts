@@ -4,10 +4,11 @@ import type { BandTimeSeries, RawBands } from '../types/api'
 import { searchSentinel2Items, stacItemDate } from './planetaryComputerApi'
 
 const PC_TILER_BASE = import.meta.env.VITE_PC_TILER_BASE || 'https://planetarycomputer.microsoft.com/api/data/v1'
-const BAND_NAMES = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'SCL'] as const
+const OUTPUT_BAND_NAMES = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'SCL'] as const
+const REQUEST_BAND_NAMES = ['B04', 'B08', 'SCL'] as const
 const REFLECTANCE_SCALE = 10_000
 
-type BandName = typeof BAND_NAMES[number]
+type BandName = typeof OUTPUT_BAND_NAMES[number]
 
 function firstNumber(...values: unknown[]): number | null {
   for (const value of values) {
@@ -49,7 +50,7 @@ function statsForBand(root: any, band: BandName): any {
 function parseStats(json: any): RawBands {
   const root = statisticsRoot(json)
   const out = {} as RawBands
-  for (const band of BAND_NAMES) {
+  for (const band of OUTPUT_BAND_NAMES) {
     const value = medianFromStats(statsForBand(root, band))
     out[band] = value == null ? null : band === 'SCL' ? value : value / REFLECTANCE_SCALE
   }
@@ -57,7 +58,7 @@ function parseStats(json: any): RawBands {
 }
 
 function hasAnyBand(bands: RawBands): boolean {
-  return BAND_NAMES.some(band => bands[band] !== null)
+  return OUTPUT_BAND_NAMES.some(band => bands[band] !== null)
 }
 
 async function postStatistics(url: string, body: unknown): Promise<RawBands | null> {
@@ -96,7 +97,8 @@ async function fetchItemFieldBands(item: any, field: FieldFeature, collection: s
   const params = new URLSearchParams()
   params.set('collection', collection)
   params.set('item', item.id)
-  for (const band of BAND_NAMES) params.append('assets', band)
+  for (const band of REQUEST_BAND_NAMES) params.append('assets', band)
+  params.set('max_size', '256')
 
   const url = `${PC_TILER_BASE}/item/statistics?${params.toString()}`
   const safeField: FieldFeature = {
