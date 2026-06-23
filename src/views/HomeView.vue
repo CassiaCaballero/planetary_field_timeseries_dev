@@ -1,13 +1,13 @@
 <template>
   <div class="tp-shell">
     <header class="topbar">
-      <div class="brand" aria-label="Satellite Time Series Browser">
+      <div class="brand" aria-label="Crops of Magnolia">
         <svg viewBox="0 0 32 32" aria-hidden="true">
           <circle cx="16" cy="16" r="6.5" fill="var(--accent)" />
           <ellipse cx="16" cy="16" rx="13.5" ry="6" stroke="var(--accent)" stroke-width="1.6" opacity=".82" transform="rotate(-28 16 16)" />
           <circle cx="27" cy="9.5" r="1.8" fill="var(--accent-2)" />
         </svg>
-        <div class="brand-title">Satellite Time Series Browser</div>
+        <div class="brand-title">Crops of Magnolia</div>
       </div>
 
       <form class="search" @submit.prevent="runSearch">
@@ -207,7 +207,7 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
-                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>-1</span><span>NDVI</span><span>1</span></div>
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>0</span><span>NDVI</span><span>1</span></div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
@@ -447,7 +447,7 @@ watch(() => appStore.coordinate, () => {
 
 watch(() => appStore.selectedField, () => {
   fieldsLayer?.setStyle(feature => ({
-    color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#ffff00' : '#00d084',
+    color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
     weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
     fillOpacity: 0.08,
   }))
@@ -642,7 +642,7 @@ async function loadFieldsLayer() {
     fieldsLayer?.remove()
     fieldsLayer = L.geoJSON(fields, {
       style: feature => ({
-        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#ffff00' : '#00d084',
+        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
         weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
         fillOpacity: 0.08,
       }),
@@ -1942,7 +1942,7 @@ onUnmounted(() => {
   color: #111;
   font-size: 0.7rem;
   font-weight: 700;
-  background: linear-gradient(to right, #a50026, #fdae61, #ffffbf, #a6d96a, #006837);
+  background: linear-gradient(to right, #ffffbf, #a6d96a, #1a9850, #006837);
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 </style>

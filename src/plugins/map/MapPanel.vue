@@ -118,7 +118,7 @@ async function loadFields() {
     fieldsLayer?.remove()
     fieldsLayer = L.geoJSON(fields, {
       style: feature => ({
-        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#ffff00' : '#00d084',
+        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
         weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
         fillOpacity: 0.08,
       }),
