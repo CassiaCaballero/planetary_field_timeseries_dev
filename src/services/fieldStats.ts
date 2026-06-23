@@ -61,14 +61,35 @@ function hasAnyBand(bands: RawBands): boolean {
 }
 
 async function postStatistics(url: string, body: unknown): Promise<RawBands | null> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) return null
+    const bands = parseStats(await res.json())
+    return hasAnyBand(bands) ? bands : null
+  } catch {
+    return null
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  limit: number,
+  worker: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let next = 0
+  const runners = Array.from({ length: Math.min(limit, values.length) }, async () => {
+    while (next < values.length) {
+      const index = next++
+      results[index] = await worker(values[index])
+    }
   })
-  if (!res.ok) return null
-  const bands = parseStats(await res.json())
-  return hasAnyBand(bands) ? bands : null
+  await Promise.all(runners)
+  return results
 }
 
 async function fetchItemFieldBands(item: any, field: FieldFeature, collection: string): Promise<RawBands | null> {
@@ -112,9 +133,9 @@ export async function fetchFieldBandTimeSeries(
     if (!existing || (item.properties['eo:cloud_cover'] ?? Infinity) < (existing.properties['eo:cloud_cover'] ?? Infinity)) byDate.set(date, item)
   }
   const result: BandTimeSeries = {}
-  await Promise.all([...byDate.values()].map(async item => {
+  await mapWithConcurrency([...byDate.values()], 3, async item => {
     const bands = await fetchItemFieldBands(item, field, collection)
     if (bands) result[stacItemDate(item)] = bands
-  }))
+  })
   return result
 }
