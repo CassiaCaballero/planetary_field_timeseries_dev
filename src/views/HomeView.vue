@@ -1014,6 +1014,7 @@ onUnmounted(() => {
   gap: 16px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   z-index: 1200;
 }
@@ -1046,6 +1047,7 @@ onUnmounted(() => {
   height: 34px;
   padding: 0 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
@@ -1289,10 +1291,10 @@ onUnmounted(() => {
   transform: translateX(-50%);
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(18, 24, 38, 0.88);
-  color: var(--text-secondary);
+  background: rgba(26, 38, 56, 0.72);
+  backdrop-filter: blur(12px);
+  color: var(--accent);
   padding: 8px 16px;
-  backdrop-filter: blur(8px);
 }
 
 .basemap-switcher {
@@ -1334,6 +1336,7 @@ onUnmounted(() => {
   width: 50vw;
   height: 100%;
   background: var(--bg-panel);
+  backdrop-filter: blur(16px);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-pop);
   transform: translateX(100%);
@@ -1384,6 +1387,7 @@ onUnmounted(() => {
   margin-bottom: 14px;
   padding: 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -1640,7 +1644,6 @@ onUnmounted(() => {
   color: var(--error);
 }
 
-
 .statusbar {
   grid-area: status;
   display: flex;
@@ -1648,6 +1651,7 @@ onUnmounted(() => {
   gap: 18px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-mono);
