@@ -1,13 +1,14 @@
 <template>
   <div class="tp-shell">
     <header class="topbar">
-      <div class="brand" aria-label="Satellite Time Series Browser">
+      <div class="brand" aria-label="Crops of Magnolia">
         <svg viewBox="0 0 32 32" aria-hidden="true">
-          <circle cx="16" cy="16" r="6.5" fill="var(--accent)" />
-          <ellipse cx="16" cy="16" rx="13.5" ry="6" stroke="var(--accent)" stroke-width="1.6" opacity=".82" transform="rotate(-28 16 16)" />
-          <circle cx="27" cy="9.5" r="1.8" fill="var(--accent-2)" />
+          <path d="M16 27V10" stroke="var(--accent-2)" stroke-width="2.2" stroke-linecap="round" />
+          <path d="M15.8 14.5C9.2 14.2 5.2 10.1 5 5.3c5.7-.4 10.3 2.6 11.7 8.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M17 18.5c6.4.2 10.1-3.6 10.4-8.2-5.6-.5-9.9 2.2-11.3 7.4" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M9 27h14" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" />
         </svg>
-        <div class="brand-title">Satellite Time Series Browser</div>
+        <div class="brand-title">Crops of Magnolia</div>
       </div>
 
       <form class="search" @submit.prevent="runSearch">
@@ -109,7 +110,7 @@
 
     <main class="map-stage">
       <div ref="mapEl" class="map"></div>
-      <div v-if="!inspectorOpen" class="map-hint">Click anywhere on the map to analyze a Sentinel-2 time series</div>
+      <div v-if="!inspectorOpen" class="map-hint">Click in any field to analyze NDVI timeseries from Sentinel-2 satellite</div>
 
       <div class="basemap-switcher">
         <button
@@ -142,6 +143,7 @@
               <span class="segmented">
                 <button :class="{ active: previewLayer === 'TRUE-COLOR' }" @click="previewLayer = 'TRUE-COLOR'">True</button>
                 <button :class="{ active: previewLayer === 'FALSE-COLOR' }" @click="previewLayer = 'FALSE-COLOR'">False</button>
+                <button :class="{ active: previewLayer === 'NDVI' }" @click="previewLayer = 'NDVI'">NDVI</button>
                 <template v-for="layer in activeClimateLayers" :key="layer.id">
                   <button
                     :class="{ active: previewLayer === layer.imageryMode }"
@@ -206,6 +208,7 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>0</span><span>NDVI</span><span>1</span></div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
@@ -330,6 +333,7 @@ import {
   type ClimatePoint,
 } from '../services/climateApi'
 import type { Flags, FlagLabels } from '../types/state'
+import { loadMississippiFields, type FieldFeature } from '../services/fieldBoundaries'
 
 
 const appStore = useAppStore()
@@ -442,6 +446,14 @@ watch(() => appStore.coordinate, () => {
   centerPreviewMap(PREVIEW_DEFAULT_ZOOM)
 })
 
+watch(() => appStore.selectedField, () => {
+  fieldsLayer?.setStyle(feature => ({
+    color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+    weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+    fillOpacity: 0.08,
+  }))
+}, { deep: true })
+
 function zoomImageIn() {
   previewMap?.zoomIn()
 }
@@ -529,6 +541,7 @@ let map: L.Map | null = null
 let baseLayer: L.TileLayer | null = null
 let labelLayer: L.TileLayer | null = null
 let marker: L.Marker | null = null
+let fieldsLayer: L.GeoJSON | null = null
 let previewMap: L.Map | null = null
 let previewTileLayer: L.TileLayer | null = null
 let previewMarker: L.Marker | null = null
@@ -622,6 +635,35 @@ function markerIcon() {
   })
 }
 
+
+async function loadFieldsLayer() {
+  if (!map) return
+  try {
+    const fields = await loadMississippiFields()
+    fieldsLayer?.remove()
+    fieldsLayer = L.geoJSON(fields, {
+      style: feature => ({
+        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+        weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+        fillOpacity: 0.08,
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on('click', (e: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(e)
+          const bounds = (layer as L.Polygon).getBounds()
+          const center = bounds.getCenter()
+          setSelectedPoint(center.lng, center.lat, `Field ${(feature as FieldFeature).properties.fieldId}`, feature as FieldFeature)
+          map?.fitBounds(bounds, { padding: [40, 40] })
+        })
+      },
+    }).addTo(map)
+    const bounds = fieldsLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] })
+  } catch (e) {
+    showToast(`Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
 function previewMarkerIcon() {
   return L.divIcon({
     className: 'tp-preview-marker',
@@ -655,7 +697,8 @@ function centerMainMapOnPoint(lon: number, lat: number, zoom = map?.getZoom() ??
   else map.setView(center, zoom)
 }
 
-function setSelectedPoint(lon: number, lat: number, name = 'Selected location') {
+function setSelectedPoint(lon: number, lat: number, name = 'Selected location', field: FieldFeature | null = null) {
+  appStore.setSelectedField(field)
   appStore.setCoordinate(lon, lat)
   placeName.value = name
   inspectorOpen.value = true
@@ -914,13 +957,15 @@ onMounted(() => {
 
   map.on('click', (e: L.LeafletMouseEvent) => {
     const { lng, lat } = e.latlng.wrap()
-    setSelectedPoint(lng, lat)
+    setSelectedPoint(lng, lat, 'Selected location', null)
   })
   map.on('mousemove', (e: L.LeafletMouseEvent) => {
     statusCoordinate.value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
   })
   map.on('zoomend', () => { mapZoom.value = map?.getZoom() ?? mapZoom.value })
   mapZoom.value = map.getZoom()
+
+  loadFieldsLayer()
 
   if (inspectorOpen.value) {
     marker = L.marker([lat, lon], { icon: markerIcon() }).addTo(map)
@@ -969,6 +1014,7 @@ onUnmounted(() => {
   gap: 16px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   z-index: 1200;
 }
@@ -1001,6 +1047,7 @@ onUnmounted(() => {
   height: 34px;
   padding: 0 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
@@ -1244,10 +1291,10 @@ onUnmounted(() => {
   transform: translateX(-50%);
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(18, 24, 38, 0.88);
-  color: var(--text-secondary);
+  background: rgba(26, 38, 56, 0.72);
+  backdrop-filter: blur(12px);
+  color: var(--accent);
   padding: 8px 16px;
-  backdrop-filter: blur(8px);
 }
 
 .basemap-switcher {
@@ -1289,6 +1336,7 @@ onUnmounted(() => {
   width: 50vw;
   height: 100%;
   background: var(--bg-panel);
+  backdrop-filter: blur(16px);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-pop);
   transform: translateX(100%);
@@ -1339,6 +1387,7 @@ onUnmounted(() => {
   margin-bottom: 14px;
   padding: 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -1595,7 +1644,6 @@ onUnmounted(() => {
   color: var(--error);
 }
 
-
 .statusbar {
   grid-area: status;
   display: flex;
@@ -1603,6 +1651,7 @@ onUnmounted(() => {
   gap: 18px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -1879,5 +1928,26 @@ onUnmounted(() => {
   .inspector.open {
     transform: translateY(0);
   }
+}
+</style>
+
+
+<style scoped>
+.ndvi-scale {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 34px;
+  z-index: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #111;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: linear-gradient(to right, #ffffbf, #a6d96a, #1a9850, #006837);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 </style>
