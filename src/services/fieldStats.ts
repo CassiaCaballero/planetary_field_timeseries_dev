@@ -1,3 +1,4 @@
+import type { FeatureCollection } from 'geojson'
 import type { FieldFeature } from './fieldBoundaries'
 import type { BandTimeSeries, RawBands } from '../types/api'
 import { searchSentinel2Items, stacItemDate } from './planetaryComputerApi'
@@ -6,20 +7,68 @@ const PC_TILER_BASE = import.meta.env.VITE_PC_TILER_BASE || 'https://planetaryco
 const BAND_NAMES = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'SCL'] as const
 const REFLECTANCE_SCALE = 10_000
 
+type BandName = typeof BAND_NAMES[number]
+
+function firstNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return null
+}
+
 function medianFromStats(stats: any): number | null {
   if (!stats) return null
-  const value = stats.percentile_50 ?? stats.median ?? stats.p50
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+  return firstNumber(
+    stats.percentile_50,
+    stats.percentiles?.['50'],
+    stats.percentiles?.[50],
+    stats.p50,
+    stats.median,
+    // Some TiTiler deployments do not return percentiles unless explicitly
+    // configured. Mean is still a field aggregate and is better than dropping
+    // the whole date from the available-scene list.
+    stats.mean,
+  )
+}
+
+function statisticsRoot(json: any): any {
+  return json?.features?.[0]?.properties?.statistics
+    ?? json?.features?.[0]?.properties
+    ?? json?.properties?.statistics
+    ?? json?.statistics
+    ?? json
+}
+
+function statsForBand(root: any, band: BandName): any {
+  return root?.[band]
+    ?? root?.[`${band}_b1`]
+    ?? root?.[band]?.b1
+    ?? root?.[band]?.['1']
 }
 
 function parseStats(json: any): RawBands {
+  const root = statisticsRoot(json)
   const out = {} as RawBands
   for (const band of BAND_NAMES) {
-    const stats = json?.properties?.statistics?.[band] ?? json?.statistics?.[band] ?? json?.[band]
-    const value = medianFromStats(stats)
+    const value = medianFromStats(statsForBand(root, band))
     out[band] = value == null ? null : band === 'SCL' ? value : value / REFLECTANCE_SCALE
   }
   return out
+}
+
+function hasAnyBand(bands: RawBands): boolean {
+  return BAND_NAMES.some(band => bands[band] !== null)
+}
+
+async function postStatistics(url: string, body: unknown): Promise<RawBands | null> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) return null
+  const bands = parseStats(await res.json())
+  return hasAnyBand(bands) ? bands : null
 }
 
 async function fetchItemFieldBands(item: any, field: FieldFeature, collection: string): Promise<RawBands | null> {
@@ -27,17 +76,12 @@ async function fetchItemFieldBands(item: any, field: FieldFeature, collection: s
   params.set('collection', collection)
   params.set('item', item.id)
   for (const band of BAND_NAMES) params.append('assets', band)
-  try {
-    const res = await fetch(`${PC_TILER_BASE}/item/statistics?${params.toString()}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(field),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return parseStats(await res.json())
-  } catch {
-    return null
-  }
+
+  const url = `${PC_TILER_BASE}/item/statistics?${params.toString()}`
+  const collectionBody: FeatureCollection = { type: 'FeatureCollection', features: [field] }
+
+  return await postStatistics(url, collectionBody)
+    ?? await postStatistics(url, field)
 }
 
 function centroid(field: FieldFeature): [number, number] {
