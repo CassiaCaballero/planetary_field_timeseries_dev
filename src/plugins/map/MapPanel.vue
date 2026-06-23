@@ -40,6 +40,7 @@ import {
   type PcLayer,
 } from '../../services/planetaryComputerApi'
 import PanelSettingsModal from '../../components/PanelSettingsModal.vue'
+import { loadMississippiFields, type FieldFeature } from '../../services/fieldBoundaries'
 
 // dockview-vue passes a single `params` prop containing both the user-defined
 // params (under params.params) and the panel API (under params.api).
@@ -70,8 +71,10 @@ let map: L.Map | null = null
 let basemap: L.TileLayer | null = null
 let imageryLayer: L.TileLayer | null = null
 let marker: L.Polygon | null = null
+let fieldsLayer: L.GeoJSON | null = null
 let resizeObserver: ResizeObserver | null = null
 let imageryRequestId = 0
+let fieldsRequestId = 0
 
 const coordinate = computed(() => appStore.coordinate)
 const selectedDate = computed(() => appStore.selectedDate)
@@ -103,6 +106,37 @@ function initMap() {
 
   resizeObserver = new ResizeObserver(() => map?.invalidateSize())
   resizeObserver.observe(mapEl.value)
+}
+
+
+async function loadFields() {
+  if (!map) return
+  const requestId = ++fieldsRequestId
+  try {
+    const fields = await loadMississippiFields()
+    if (requestId !== fieldsRequestId || !map) return
+    fieldsLayer?.remove()
+    fieldsLayer = L.geoJSON(fields, {
+      style: feature => ({
+        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#ffff00' : '#00d084',
+        weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+        fillOpacity: 0.08,
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on('click', () => {
+          const field = feature as FieldFeature
+          appStore.setSelectedField(field)
+          const center = (layer as L.Polygon).getBounds().getCenter()
+          appStore.setCoordinate(center.lng, center.lat)
+        })
+      },
+    }).addTo(map)
+    const bounds = fieldsLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] })
+  } catch (e) {
+    status.value = 'error'
+    errorDetail.value = `Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`
+  }
 }
 
 async function updateImagery() {
@@ -193,6 +227,7 @@ watch(() => appStore.effectiveTheme, () => { basemap?.setUrl(basemapUrl()) })
 onMounted(() => {
   panelApi()?.setTitle(layerTitle(activeLayer.value))
   initMap()
+  loadFields()
   updateImagery()
 })
 
@@ -203,6 +238,7 @@ onUnmounted(() => {
   map = null
   imageryLayer = null
   marker = null
+  fieldsLayer = null
 })
 </script>
 
