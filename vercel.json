@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/field-boundaries/2025_N33W091.parquet",
-      "destination": "https://pub-ae42f8c1a3e34c4c8485710526e233ab.r2.dev/2025_N33W091.parquet"
+      "source": "/field-boundaries/merged_fields_ms.parquet",
+      "destination": "https://pub-ae42f8c1a3e34c4c8485710526e233ab.r2.dev/merged_fields_ms.parquet"
     }
   ],
   "headers": [

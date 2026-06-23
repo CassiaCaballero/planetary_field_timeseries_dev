@@ -1,9 +1,9 @@
 import type { Feature, FeatureCollection, Geometry, Polygon, MultiPolygon } from 'geojson'
 
 const R2_MISSISSIPPI_FIELDS_PARQUET_URL =
-  'https://pub-ae42f8c1a3e34c4c8485710526e233ab.r2.dev/2025_N33W091.parquet'
+  'https://pub-ae42f8c1a3e34c4c8485710526e233ab.r2.dev/merged_fields_ms.parquet'
 
-const VERCEL_FIELDS_PARQUET_PATH = '/field-boundaries/2025_N33W091.parquet'
+const VERCEL_FIELDS_PARQUET_PATH = '/field-boundaries/merged_fields_ms.parquet'
 
 export const MISSISSIPPI_FIELDS_PARQUET_URL =
   import.meta.env.VITE_FIELDS_PARQUET_URL || VERCEL_FIELDS_PARQUET_PATH
