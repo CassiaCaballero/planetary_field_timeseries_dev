@@ -143,6 +143,10 @@ async function readParquetRows(file: ArrayBuffer): Promise<Record<string, unknow
     parquetRead({
       file,
       rowFormat: 'object',
+      // Keep unannotated BYTE_ARRAY columns as bytes so WKB geometry is not
+      // corrupted by UTF-8 decoding before parseWkb() sees it. GeoParquet
+      // geometry columns are still decoded by hyparquet when metadata exists.
+      utf8: false,
       onComplete: (data: Record<string, unknown>[]) => resolve(data),
       onError: reject,
     })
