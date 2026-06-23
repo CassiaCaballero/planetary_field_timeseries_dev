@@ -142,6 +142,7 @@
               <span class="segmented">
                 <button :class="{ active: previewLayer === 'TRUE-COLOR' }" @click="previewLayer = 'TRUE-COLOR'">True</button>
                 <button :class="{ active: previewLayer === 'FALSE-COLOR' }" @click="previewLayer = 'FALSE-COLOR'">False</button>
+                <button :class="{ active: previewLayer === 'NDVI' }" @click="previewLayer = 'NDVI'">NDVI</button>
                 <template v-for="layer in activeClimateLayers" :key="layer.id">
                   <button
                     :class="{ active: previewLayer === layer.imageryMode }"
@@ -206,6 +207,7 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>-1</span><span>NDVI</span><span>1</span></div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
@@ -330,6 +332,7 @@ import {
   type ClimatePoint,
 } from '../services/climateApi'
 import type { Flags, FlagLabels } from '../types/state'
+import { loadMississippiFields, type FieldFeature } from '../services/fieldBoundaries'
 
 
 const appStore = useAppStore()
@@ -442,6 +445,14 @@ watch(() => appStore.coordinate, () => {
   centerPreviewMap(PREVIEW_DEFAULT_ZOOM)
 })
 
+watch(() => appStore.selectedField, () => {
+  fieldsLayer?.setStyle(feature => ({
+    color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#ffff00' : '#00d084',
+    weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+    fillOpacity: 0.08,
+  }))
+}, { deep: true })
+
 function zoomImageIn() {
   previewMap?.zoomIn()
 }
@@ -529,6 +540,7 @@ let map: L.Map | null = null
 let baseLayer: L.TileLayer | null = null
 let labelLayer: L.TileLayer | null = null
 let marker: L.Marker | null = null
+let fieldsLayer: L.GeoJSON | null = null
 let previewMap: L.Map | null = null
 let previewTileLayer: L.TileLayer | null = null
 let previewMarker: L.Marker | null = null
@@ -622,6 +634,35 @@ function markerIcon() {
   })
 }
 
+
+async function loadFieldsLayer() {
+  if (!map) return
+  try {
+    const fields = await loadMississippiFields()
+    fieldsLayer?.remove()
+    fieldsLayer = L.geoJSON(fields, {
+      style: feature => ({
+        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#ffff00' : '#00d084',
+        weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+        fillOpacity: 0.08,
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on('click', (e: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(e)
+          const bounds = (layer as L.Polygon).getBounds()
+          const center = bounds.getCenter()
+          setSelectedPoint(center.lng, center.lat, `Field ${(feature as FieldFeature).properties.fieldId}`, feature as FieldFeature)
+          map?.fitBounds(bounds, { padding: [40, 40] })
+        })
+      },
+    }).addTo(map)
+    const bounds = fieldsLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] })
+  } catch (e) {
+    showToast(`Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
 function previewMarkerIcon() {
   return L.divIcon({
     className: 'tp-preview-marker',
@@ -655,7 +696,8 @@ function centerMainMapOnPoint(lon: number, lat: number, zoom = map?.getZoom() ??
   else map.setView(center, zoom)
 }
 
-function setSelectedPoint(lon: number, lat: number, name = 'Selected location') {
+function setSelectedPoint(lon: number, lat: number, name = 'Selected location', field: FieldFeature | null = null) {
+  appStore.setSelectedField(field)
   appStore.setCoordinate(lon, lat)
   placeName.value = name
   inspectorOpen.value = true
@@ -914,13 +956,15 @@ onMounted(() => {
 
   map.on('click', (e: L.LeafletMouseEvent) => {
     const { lng, lat } = e.latlng.wrap()
-    setSelectedPoint(lng, lat)
+    setSelectedPoint(lng, lat, 'Selected location', null)
   })
   map.on('mousemove', (e: L.LeafletMouseEvent) => {
     statusCoordinate.value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
   })
   map.on('zoomend', () => { mapZoom.value = map?.getZoom() ?? mapZoom.value })
   mapZoom.value = map.getZoom()
+
+  loadFieldsLayer()
 
   if (inspectorOpen.value) {
     marker = L.marker([lat, lon], { icon: markerIcon() }).addTo(map)
@@ -1879,5 +1923,26 @@ onUnmounted(() => {
   .inspector.open {
     transform: translateY(0);
   }
+}
+</style>
+
+
+<style scoped>
+.ndvi-scale {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 34px;
+  z-index: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #111;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: linear-gradient(to right, #a50026, #fdae61, #ffffbf, #a6d96a, #006837);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 </style>
