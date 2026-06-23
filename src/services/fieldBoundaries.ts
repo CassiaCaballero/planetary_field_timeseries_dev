@@ -6,7 +6,7 @@ const R2_MISSISSIPPI_FIELDS_PARQUET_URL =
 const VERCEL_FIELDS_PARQUET_PATH = '/field-boundaries/merged_fields_ms.parquet'
 
 export const MISSISSIPPI_FIELDS_PARQUET_URL =
-  import.meta.env.VITE_FIELDS_PARQUET_URL || VERCEL_FIELDS_PARQUET_PATH
+  import.meta.env.VITE_FIELDS_PARQUET_URL || R2_MISSISSIPPI_FIELDS_PARQUET_URL
 
 export type FieldFeature = Feature<Polygon | MultiPolygon, Record<string, unknown> & { fieldId: string }>
 
@@ -150,16 +150,26 @@ async function loadHyparquet(): Promise<any> {
   return import(/* @vite-ignore */ 'https://esm.sh/hyparquet@1.17.1')
 }
 
-async function readRows(): Promise<Record<string, unknown>[]> {
-  const response = await fetch(MISSISSIPPI_FIELDS_PARQUET_URL)
-  if (response.ok) return readParquetRows(await response.arrayBuffer())
-
-  if (MISSISSIPPI_FIELDS_PARQUET_URL !== R2_MISSISSIPPI_FIELDS_PARQUET_URL) {
-    const fallback = await fetch(R2_MISSISSIPPI_FIELDS_PARQUET_URL)
-    if (fallback.ok) return readParquetRows(await fallback.arrayBuffer())
+async function fetchParquet(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const response = await fetch(url)
+    return response.ok ? await response.arrayBuffer() : null
+  } catch {
+    return null
   }
+}
 
-  throw new Error(`HTTP ${response.status} while loading field parquet`)
+async function readRows(): Promise<Record<string, unknown>[]> {
+  const primary = await fetchParquet(MISSISSIPPI_FIELDS_PARQUET_URL)
+  if (primary) return readParquetRows(primary)
+
+  const fallbackUrl = MISSISSIPPI_FIELDS_PARQUET_URL === VERCEL_FIELDS_PARQUET_PATH
+    ? R2_MISSISSIPPI_FIELDS_PARQUET_URL
+    : VERCEL_FIELDS_PARQUET_PATH
+  const fallback = await fetchParquet(fallbackUrl)
+  if (fallback) return readParquetRows(fallback)
+
+  throw new Error('Unable to load field parquet')
 }
 
 async function readParquetRows(file: ArrayBuffer): Promise<Record<string, unknown>[]> {
