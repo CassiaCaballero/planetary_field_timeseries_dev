@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    {
+      "source": "/field-boundaries/2025_N33W091.parquet",
+      "destination": "https://pub-ae42f8c1a3e34c4c8485710526e233ab.r2.dev/2025_N33W091.parquet"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/field-boundaries/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, s-maxage=604800"
+        }
+      ]
+    }
+  ]
+}
