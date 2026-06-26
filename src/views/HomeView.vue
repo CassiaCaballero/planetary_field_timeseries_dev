@@ -208,7 +208,7 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
-                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>0</span><span>NDVI</span><span>1</span></div>
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>-1</span><span>NDVI</span><span>1</span></div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
