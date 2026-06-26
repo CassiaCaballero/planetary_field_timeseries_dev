@@ -230,7 +230,7 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
       params.set('asset_as_band', 'true')
       params.set('expression', '((B08*1.0)-B04)/((B08*1.0)+B04)')
       params.set('rescale', '-1,1')
-      params.set('colormap_name', 'rdylgn')
+      params.set('colormap_name', 'turbo')
       break
     case 'NDWI':
       params.append('assets', 'B03')

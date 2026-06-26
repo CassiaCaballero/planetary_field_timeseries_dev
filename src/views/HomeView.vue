@@ -453,6 +453,7 @@ watch(() => appStore.selectedField, () => {
     weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
     fillOpacity: 0.08,
   }))
+  updatePreviewFieldMask()
 }, { deep: true })
 
 function zoomImageIn() {
@@ -547,6 +548,8 @@ let allFields: FeatureCollection<Polygon | MultiPolygon> | null = null
 let fieldsLoading = false
 let previewMap: L.Map | null = null
 let previewTileLayer: L.TileLayer | null = null
+let previewFieldMask: L.Polygon | null = null
+let previewFieldOutline: L.GeoJSON | null = null
 let previewMarker: L.Marker | null = null
 let previewResizeObserver: ResizeObserver | null = null
 let sceneRequestId = 0
@@ -802,6 +805,43 @@ function updatePreviewMarker() {
   previewMarker?.setLatLng([lat, lon])
 }
 
+function fieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
+  const polygons = field.geometry.type === 'Polygon' ? [field.geometry.coordinates] : field.geometry.coordinates
+  return polygons
+    .map(polygon => polygon[0]?.map(([lng, lat]) => [lat, lng] as L.LatLngExpression) ?? [])
+    .filter(ring => ring.length > 0)
+}
+
+function updatePreviewFieldMask() {
+  previewFieldMask?.remove()
+  previewFieldOutline?.remove()
+  previewFieldMask = null
+  previewFieldOutline = null
+
+  if (!previewMap || previewLayer.value !== 'NDVI' || !appStore.selectedField) return
+
+  const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
+  const cropRings = fieldExteriorRings(appStore.selectedField)
+  if (!cropRings.length) return
+
+  previewFieldMask = L.polygon([worldRing, ...cropRings], {
+    stroke: false,
+    fillColor: '#132033',
+    fillOpacity: 0.82,
+    fillRule: 'evenodd',
+    interactive: false,
+  }).addTo(previewMap)
+
+  previewFieldOutline = L.geoJSON(appStore.selectedField, {
+    interactive: false,
+    style: {
+      color: '#FFC145',
+      weight: 2,
+      fillOpacity: 0,
+    },
+  }).addTo(previewMap)
+}
+
 function centerPreviewMap(zoom = previewTileZoom.value) {
   if (!previewMap) return
   const [lon, lat] = appStore.coordinate
@@ -834,6 +874,7 @@ async function updatePreviewImagery() {
     }
 
     updatePreviewMarker()
+    updatePreviewFieldMask()
     previewMarker?.bringToFront()
     centerPreviewMap(previewTileZoom.value)
   } catch (e) {
@@ -850,6 +891,8 @@ function destroyPreviewMap() {
   previewMap?.remove()
   previewMap = null
   previewTileLayer = null
+  previewFieldMask = null
+  previewFieldOutline = null
   previewMarker = null
 }
 
