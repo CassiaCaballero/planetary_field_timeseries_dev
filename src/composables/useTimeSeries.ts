@@ -1,6 +1,7 @@
 import { ref, computed, watch, type Ref } from 'vue'
 import { useAppStore } from '../stores/app'
 import { fetchBandTimeSeries } from '../services/bandCache'
+import { fetchFieldBandTimeSeries } from '../services/fieldStats'
 import type { BandTimeSeries, TimeSeriesPoint } from '../types/api'
 import type { DataSource } from '../types/datasource'
 
@@ -89,7 +90,9 @@ export function useTimeSeries(
       if (MOCK) {
         bandData.value = generateMockBandData(startDate, endDate)
       } else {
-        bandData.value = await fetchBandTimeSeries(lon, lat, startDate, endDate, ds.collection, force)
+        bandData.value = appStore.selectedField
+          ? await fetchFieldBandTimeSeries(appStore.selectedField, startDate, endDate, ds.collection)
+          : await fetchBandTimeSeries(lon, lat, startDate, endDate, ds.collection, force)
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
@@ -110,7 +113,7 @@ export function useTimeSeries(
   // Re-fetch bands when location or dates change.
   // maskClouds and dataSource changes are handled by the computed above.
   watch(
-    [() => appStore.coordinate, () => appStore.startDate, () => appStore.endDate],
+    [() => appStore.coordinate, () => appStore.selectedField, () => appStore.startDate, () => appStore.endDate],
     () => {
       // Clear stale data immediately so the chart doesn't show a previous
       // location's series while the new fetch is in flight.
