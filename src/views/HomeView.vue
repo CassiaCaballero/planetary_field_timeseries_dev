@@ -334,6 +334,7 @@ import {
 } from '../services/climateApi'
 import type { Flags, FlagLabels } from '../types/state'
 import { loadMississippiFields, type FieldFeature } from '../services/fieldBoundaries'
+import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson'
 
 
 const appStore = useAppStore()
@@ -542,6 +543,8 @@ let baseLayer: L.TileLayer | null = null
 let labelLayer: L.TileLayer | null = null
 let marker: L.Marker | null = null
 let fieldsLayer: L.GeoJSON | null = null
+let allFields: FeatureCollection<Polygon | MultiPolygon> | null = null
+let fieldsLoading = false
 let previewMap: L.Map | null = null
 let previewTileLayer: L.TileLayer | null = null
 let previewMarker: L.Marker | null = null
@@ -555,6 +558,10 @@ const presets = [
   { id: '5y', label: 'Last 5 years', short: '5y' },
   { id: 'all', label: 'Full archive', short: '2015-' },
 ]
+
+const MISSISSIPPI_INITIAL_CENTER: L.LatLngExpression = [32.75, -89.7]
+const MISSISSIPPI_INITIAL_ZOOM = 7
+const FIELD_LOAD_ZOOM = 16
 
 const formattedCoordinate = computed(() => {
   const [lon, lat] = appStore.coordinate
@@ -635,33 +642,77 @@ function markerIcon() {
   })
 }
 
+function fieldCoordinates(feature: FieldFeature): number[][] {
+  return feature.geometry.type === 'Polygon'
+    ? feature.geometry.coordinates.flat()
+    : feature.geometry.coordinates.flat(2)
+}
+
+function fieldIntersectsMapBounds(feature: FieldFeature, bounds: L.LatLngBounds) {
+  return fieldCoordinates(feature).some(([lng, lat]) => bounds.contains([lat, lng]))
+}
+
+function visibleFields() {
+  if (!map || !allFields) return null
+  const bounds = map.getBounds().pad(0.15)
+  return {
+    type: 'FeatureCollection' as const,
+    features: allFields.features.filter(feature => fieldIntersectsMapBounds(feature as FieldFeature, bounds)),
+  }
+}
+
+function renderVisibleFields() {
+  if (!map || !allFields) return
+  const visible = visibleFields()
+  fieldsLayer?.remove()
+  if (!visible?.features.length) {
+    fieldsLayer = null
+    return
+  }
+  fieldsLayer = L.geoJSON(visible, {
+    style: feature => ({
+      color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+      weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+      fillOpacity: 0.08,
+    }),
+    onEachFeature: (feature, layer) => {
+      layer.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e)
+        const bounds = (layer as L.Polygon).getBounds()
+        const center = bounds.getCenter()
+        setSelectedPoint(center.lng, center.lat, `Field ${(feature as FieldFeature).properties.fieldId}`, feature as FieldFeature)
+        map?.fitBounds(bounds, { padding: [40, 40] })
+      })
+    },
+  }).addTo(map)
+}
+
+async function updateFieldsLayerForZoom() {
+  if (!map) return
+  if (map.getZoom() < FIELD_LOAD_ZOOM) {
+    fieldsLayer?.remove()
+    fieldsLayer = null
+    return
+  }
+  if (allFields) {
+    renderVisibleFields()
+    return
+  }
+  if (fieldsLoading) return
+  fieldsLoading = true
+  try {
+    allFields = await loadMississippiFields()
+    renderVisibleFields()
+  } catch (e) {
+    showToast(`Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    fieldsLoading = false
+  }
+}
 
 async function loadFieldsLayer() {
   if (!map) return
-  try {
-    const fields = await loadMississippiFields()
-    fieldsLayer?.remove()
-    fieldsLayer = L.geoJSON(fields, {
-      style: feature => ({
-        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
-        weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
-        fillOpacity: 0.08,
-      }),
-      onEachFeature: (feature, layer) => {
-        layer.on('click', (e: L.LeafletMouseEvent) => {
-          L.DomEvent.stopPropagation(e)
-          const bounds = (layer as L.Polygon).getBounds()
-          const center = bounds.getCenter()
-          setSelectedPoint(center.lng, center.lat, `Field ${(feature as FieldFeature).properties.fieldId}`, feature as FieldFeature)
-          map?.fitBounds(bounds, { padding: [40, 40] })
-        })
-      },
-    }).addTo(map)
-    const bounds = fieldsLayer.getBounds()
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] })
-  } catch (e) {
-    showToast(`Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`)
-  }
+  await updateFieldsLayerForZoom()
 }
 
 function previewMarkerIcon() {
@@ -948,7 +999,7 @@ onMounted(() => {
     zoomControl: false,
     attributionControl: true,
     worldCopyJump: true,
-  }).setView([lat, lon], inspectorOpen.value ? 13 : 3)
+  }).setView(inspectorOpen.value ? [lat, lon] : MISSISSIPPI_INITIAL_CENTER, inspectorOpen.value ? 13 : MISSISSIPPI_INITIAL_ZOOM)
   L.control.zoom({ position: 'topright' }).addTo(map)
   baseLayer = L.tileLayer(def.url, def.options).addTo(map)
   if (def.labelUrl) {
@@ -962,7 +1013,10 @@ onMounted(() => {
   map.on('mousemove', (e: L.LeafletMouseEvent) => {
     statusCoordinate.value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
   })
-  map.on('zoomend', () => { mapZoom.value = map?.getZoom() ?? mapZoom.value })
+  map.on('zoomend moveend', () => {
+    mapZoom.value = map?.getZoom() ?? mapZoom.value
+    updateFieldsLayerForZoom()
+  })
   mapZoom.value = map.getZoom()
 
   loadFieldsLayer()
