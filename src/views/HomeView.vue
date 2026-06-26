@@ -359,7 +359,7 @@ const startDate = ref(appStore.startDate)
 const endDate = ref(appStore.endDate)
 const pendingStart = ref(startDate.value)
 const pendingEnd = ref(endDate.value)
-const activePreset = ref('5y')
+const activePreset = ref('1y')
 
 const previewLayer = ref<string>('TRUE-COLOR')
 const sceneLoading = ref(false)

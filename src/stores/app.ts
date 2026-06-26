@@ -4,7 +4,7 @@ import type { Flags, FlagLabels } from '../types/state'
 import type { FieldFeature } from '../services/fieldBoundaries'
 
 const today = new Date().toISOString().slice(0, 10)
-const fiveYearsAgo = new Date(Date.now() - 5 * 365.25 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+const oneYearAgo = new Date(Date.now() - 365.25 * 24 * 3600 * 1000).toISOString().slice(0, 10)
 
 export const useAppStore = defineStore('app', () => {
   const CYCLE: Array<'system' | 'dark' | 'light'> = ['system', 'dark', 'light']
@@ -27,7 +27,7 @@ export const useAppStore = defineStore('app', () => {
   const coordinate = ref<[number, number]>([-91.5, 33.5])
   const selectedDate = ref<string | null>(null)
   const selectedField = ref<FieldFeature | null>(null)
-  const startDate = ref<string>(fiveYearsAgo)
+  const startDate = ref<string>(oneYearAgo)
   const endDate = ref<string>(today)
   const flags = ref<Flags>({})
   const flagLabels = ref<FlagLabels>({})
