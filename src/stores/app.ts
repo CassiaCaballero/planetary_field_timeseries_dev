@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Flags, FlagLabels } from '../types/state'
+import type { FieldFeature } from '../services/fieldBoundaries'
 
 const today = new Date().toISOString().slice(0, 10)
-const fiveYearsAgo = new Date(Date.now() - 5 * 365.25 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+const oneYearAgo = new Date(Date.now() - 365.25 * 24 * 3600 * 1000).toISOString().slice(0, 10)
 
 export const useAppStore = defineStore('app', () => {
   const CYCLE: Array<'system' | 'dark' | 'light'> = ['system', 'dark', 'light']
@@ -23,9 +24,10 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('theme', theme.value)
   }
 
-  const coordinate = ref<[number, number]>([11.1464, 48.9207])
+  const coordinate = ref<[number, number]>([-91.5, 33.5])
   const selectedDate = ref<string | null>(null)
-  const startDate = ref<string>(fiveYearsAgo)
+  const selectedField = ref<FieldFeature | null>(null)
+  const startDate = ref<string>(oneYearAgo)
   const endDate = ref<string>(today)
   const flags = ref<Flags>({})
   const flagLabels = ref<FlagLabels>({})
@@ -47,6 +49,10 @@ export const useAppStore = defineStore('app', () => {
 
   function setCoordinate(lon: number, lat: number) {
     coordinate.value = [lon, lat]
+  }
+
+  function setSelectedField(field: FieldFeature | null) {
+    selectedField.value = field
   }
 
   function setSelectedDate(date: string | null) {
@@ -101,6 +107,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     coordinate,
     selectedDate,
+    selectedField,
     startDate,
     endDate,
     flags,
@@ -111,6 +118,7 @@ export const useAppStore = defineStore('app', () => {
     flagDropdownFocusTick,
     saveAndNextTick,
     setCoordinate,
+    setSelectedField,
     setSelectedDate,
     setDateRange,
     setFlags,

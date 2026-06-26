@@ -40,6 +40,8 @@ import {
   type PcLayer,
 } from '../../services/planetaryComputerApi'
 import PanelSettingsModal from '../../components/PanelSettingsModal.vue'
+import { loadMississippiFields, type FieldFeature } from '../../services/fieldBoundaries'
+import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson'
 
 // dockview-vue passes a single `params` prop containing both the user-defined
 // params (under params.params) and the panel API (under params.api).
@@ -70,11 +72,16 @@ let map: L.Map | null = null
 let basemap: L.TileLayer | null = null
 let imageryLayer: L.TileLayer | null = null
 let marker: L.Polygon | null = null
+let fieldsLayer: L.GeoJSON | null = null
+let allFields: FeatureCollection<Polygon | MultiPolygon> | null = null
+let fieldsLoading = false
 let resizeObserver: ResizeObserver | null = null
 let imageryRequestId = 0
+let fieldsRequestId = 0
 
 const coordinate = computed(() => appStore.coordinate)
 const selectedDate = computed(() => appStore.selectedDate)
+const FIELD_LOAD_ZOOM = 16
 
 function pixelLatLngs(lon: number, lat: number): L.LatLngExpression[] {
   return buildPixelPolygon(lon, lat).coordinates[0].map(([lng, la]) => [la, lng] as L.LatLngExpression)
@@ -103,6 +110,78 @@ function initMap() {
 
   resizeObserver = new ResizeObserver(() => map?.invalidateSize())
   resizeObserver.observe(mapEl.value)
+  map.on('zoomend moveend', updateFieldsForZoom)
+}
+
+function fieldCoordinates(feature: FieldFeature): number[][] {
+  return feature.geometry.type === 'Polygon'
+    ? feature.geometry.coordinates.flat()
+    : feature.geometry.coordinates.flat(2)
+}
+
+function fieldIntersectsMapBounds(feature: FieldFeature, bounds: L.LatLngBounds) {
+  return fieldCoordinates(feature).some(([lng, lat]) => bounds.contains([lat, lng]))
+}
+
+function renderVisibleFields() {
+  if (!map || !allFields) return
+  const bounds = map.getBounds().pad(0.15)
+  const visible = {
+    type: 'FeatureCollection' as const,
+    features: allFields.features.filter(feature => fieldIntersectsMapBounds(feature as FieldFeature, bounds)),
+  }
+  fieldsLayer?.remove()
+  if (!visible.features.length) {
+    fieldsLayer = null
+    return
+  }
+  fieldsLayer = L.geoJSON(visible, {
+    style: feature => ({
+      color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+      weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+      fillOpacity: 0.08,
+    }),
+    onEachFeature: (feature, layer) => {
+      layer.on('click', () => {
+        const field = feature as FieldFeature
+        appStore.setSelectedField(field)
+        const center = (layer as L.Polygon).getBounds().getCenter()
+        appStore.setCoordinate(center.lng, center.lat)
+      })
+    },
+  }).addTo(map)
+}
+
+async function updateFieldsForZoom() {
+  if (!map) return
+  if (map.getZoom() < FIELD_LOAD_ZOOM) {
+    fieldsLayer?.remove()
+    fieldsLayer = null
+    return
+  }
+  if (allFields) {
+    renderVisibleFields()
+    return
+  }
+  await loadPanelFields()
+}
+
+
+async function loadPanelFields() {
+  if (!map) return
+  if (map.getZoom() < FIELD_LOAD_ZOOM || fieldsLoading) return
+  fieldsLoading = true
+  const requestId = ++fieldsRequestId
+  try {
+    allFields = await loadMississippiFields()
+    if (requestId !== fieldsRequestId || !map) return
+    renderVisibleFields()
+  } catch (e) {
+    status.value = 'error'
+    errorDetail.value = `Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`
+  } finally {
+    fieldsLoading = false
+  }
 }
 
 async function updateImagery() {
@@ -189,10 +268,12 @@ watch([coordinate, selectedDate, () => appStore.startDate, () => appStore.endDat
 }, { deep: true })
 
 watch(() => appStore.effectiveTheme, () => { basemap?.setUrl(basemapUrl()) })
+watch(() => appStore.selectedField, () => { renderVisibleFields() }, { deep: true })
 
 onMounted(() => {
   panelApi()?.setTitle(layerTitle(activeLayer.value))
   initMap()
+  loadPanelFields()
   updateImagery()
 })
 
@@ -203,6 +284,7 @@ onUnmounted(() => {
   map = null
   imageryLayer = null
   marker = null
+  fieldsLayer = null
 })
 </script>
 
