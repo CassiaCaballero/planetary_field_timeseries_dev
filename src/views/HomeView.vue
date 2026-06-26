@@ -249,7 +249,7 @@
               :flags="emptyFlags"
               :flag-labels="emptyFlagLabels"
               :selected-date="appStore.selectedDate"
-              :y-min="0"
+              :y-min="-1"
               :y-max="1"
               unit="NDVI"
               class="mini-chart"
