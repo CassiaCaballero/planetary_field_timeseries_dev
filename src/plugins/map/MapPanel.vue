@@ -184,6 +184,37 @@ async function loadFields() {
   }
 }
 
+
+async function loadFields() {
+  if (!map) return
+  const requestId = ++fieldsRequestId
+  try {
+    const fields = await loadMississippiFields()
+    if (requestId !== fieldsRequestId || !map) return
+    fieldsLayer?.remove()
+    fieldsLayer = L.geoJSON(fields, {
+      style: feature => ({
+        color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+        weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+        fillOpacity: 0.08,
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on('click', () => {
+          const field = feature as FieldFeature
+          appStore.setSelectedField(field)
+          const center = (layer as L.Polygon).getBounds().getCenter()
+          appStore.setCoordinate(center.lng, center.lat)
+        })
+      },
+    }).addTo(map)
+    const bounds = fieldsLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] })
+  } catch (e) {
+    status.value = 'error'
+    errorDetail.value = `Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`
+  }
+}
+
 async function updateImagery() {
   if (!map) return
 
