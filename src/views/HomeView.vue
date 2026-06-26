@@ -2041,10 +2041,10 @@ onUnmounted(() => {
   align-items: center;
   padding: 4px 8px;
   border-radius: 999px;
-  color: #111;
+  color: #102113;
   font-size: 0.7rem;
   font-weight: 700;
-  background: linear-gradient(to right, #ffffbf, #a6d96a, #1a9850, #006837);
+  background: linear-gradient(to right, #a50026 0%, #d73027 10%, #f46d43 20%, #fdae61 30%, #fee08b 40%, #ffffbf 50%, #d9ef8b 60%, #a6d96a 70%, #66bd63 80%, #1a9850 90%, #006837 100%);
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 </style>
