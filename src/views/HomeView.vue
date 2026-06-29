@@ -365,7 +365,7 @@ const previewLayer = ref<string>('TRUE-COLOR')
 const sceneLoading = ref(false)
 const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
-const PREVIEW_DEFAULT_ZOOM = 16
+const PREVIEW_DEFAULT_ZOOM = 12
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
