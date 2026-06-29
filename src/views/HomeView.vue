@@ -655,6 +655,30 @@ function fieldIntersectsMapBounds(feature: FieldFeature, bounds: L.LatLngBounds)
   return fieldCoordinates(feature).some(([lng, lat]) => bounds.contains([lat, lng]))
 }
 
+function pointInRing(lon: number, lat: number, ring: number[][]) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const crosses = ((yi > lat) !== (yj > lat)) && (lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)
+    if (crosses) inside = !inside
+  }
+  return inside
+}
+
+function fieldContainsPoint(feature: FieldFeature, lon: number, lat: number) {
+  const polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates
+  return polygons.some(polygon => {
+    const [outer, ...holes] = polygon
+    return Boolean(outer?.length && pointInRing(lon, lat, outer) && !holes.some(hole => pointInRing(lon, lat, hole)))
+  })
+}
+
+function fieldAtPoint(lon: number, lat: number): FieldFeature | null {
+  if (!allFields) return null
+  return (allFields.features as FieldFeature[]).find(feature => fieldContainsPoint(feature, lon, lat)) ?? null
+}
+
 function visibleFields() {
   if (!map || !allFields) return null
   const bounds = map.getBounds().pad(0.15)
@@ -681,10 +705,7 @@ function renderVisibleFields() {
     onEachFeature: (feature, layer) => {
       layer.on('click', (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e)
-        const bounds = (layer as L.Polygon).getBounds()
-        const center = bounds.getCenter()
-        setSelectedPoint(center.lng, center.lat, `Field ${(feature as FieldFeature).properties.fieldId}`, feature as FieldFeature)
-        map?.fitBounds(bounds, { padding: [40, 40] })
+        selectFieldFeature(feature as FieldFeature)
       })
     },
   }).addTo(map)
@@ -767,6 +788,15 @@ function setSelectedPoint(lon: number, lat: number, name = 'Selected location', 
   for (const id of activeClimateIds.value) fetchClimate(id)
 }
 
+function selectFieldFeature(field: FieldFeature, fitField = true) {
+  const layer = L.geoJSON(field)
+  const bounds = layer.getBounds()
+  layer.remove()
+  const center = bounds.getCenter()
+  setSelectedPoint(center.lng, center.lat, `Field ${field.properties.fieldId}`, field)
+  if (fitField) map?.fitBounds(bounds, { padding: [40, 40] })
+}
+
 async function ensurePreviewMap() {
   await nextTick()
   if (!previewMapEl.value || previewMap) return
@@ -827,7 +857,7 @@ function updatePreviewFieldMask() {
   previewFieldMask = L.polygon([worldRing, ...cropRings], {
     stroke: false,
     fillColor: '#132033',
-    fillOpacity: 0.82,
+    fillOpacity: 1,
     fillRule: 'evenodd',
     interactive: false,
   }).addTo(previewMap)
@@ -1051,6 +1081,11 @@ onMounted(() => {
 
   map.on('click', (e: L.LeafletMouseEvent) => {
     const { lng, lat } = e.latlng.wrap()
+    const field = fieldAtPoint(lng, lat)
+    if (field) {
+      selectFieldFeature(field)
+      return
+    }
     setSelectedPoint(lng, lat, 'Selected location', null)
   })
   map.on('mousemove', (e: L.LeafletMouseEvent) => {
