@@ -81,7 +81,7 @@ let fieldsRequestId = 0
 
 const coordinate = computed(() => appStore.coordinate)
 const selectedDate = computed(() => appStore.selectedDate)
-const FIELD_LOAD_ZOOM = 16
+const FIELD_LOAD_ZOOM = 12
 
 function pixelLatLngs(lon: number, lat: number): L.LatLngExpression[] {
   return buildPixelPolygon(lon, lat).coordinates[0].map(([lng, la]) => [la, lng] as L.LatLngExpression)

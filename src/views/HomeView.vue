@@ -564,7 +564,7 @@ const presets = [
 
 const MISSISSIPPI_INITIAL_CENTER: L.LatLngExpression = [32.75, -89.7]
 const MISSISSIPPI_INITIAL_ZOOM = 7
-const FIELD_LOAD_ZOOM = 16
+const FIELD_LOAD_ZOOM = 12
 
 const formattedCoordinate = computed(() => {
   const [lon, lat] = appStore.coordinate
