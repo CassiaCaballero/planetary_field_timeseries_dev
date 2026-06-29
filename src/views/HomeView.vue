@@ -365,7 +365,7 @@ const previewLayer = ref<string>('TRUE-COLOR')
 const sceneLoading = ref(false)
 const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
-const PREVIEW_DEFAULT_ZOOM = 12
+const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
@@ -2044,7 +2044,29 @@ onUnmounted(() => {
   color: #102113;
   font-size: 0.7rem;
   font-weight: 700;
-  background: linear-gradient(to right, #a50026 0%, #d73027 10%, #f46d43 20%, #fdae61 30%, #fee08b 40%, #ffffbf 50%, #d9ef8b 60%, #a6d96a 70%, #66bd63 80%, #1a9850 90%, #006837 100%);
+  background: linear-gradient(
+    to right,
+    #a50026 0% 5%,
+    #b91529 5% 10%,
+    #cc2929 10% 15%,
+    #df402f 15% 20%,
+    #ed5b3a 20% 25%,
+    #f77a4a 25% 30%,
+    #fb9658 30% 35%,
+    #fdb66d 35% 40%,
+    #fed184 40% 45%,
+    #feeb9d 45% 50%,
+    #ffffbf 50% 55%,
+    #edf8a3 55% 60%,
+    #d8ef8a 60% 65%,
+    #bfe47a 65% 70%,
+    #a6d96a 70% 75%,
+    #8acc62 75% 80%,
+    #66bd63 80% 85%,
+    #45ad5b 85% 90%,
+    #1a9850 90% 95%,
+    #006837 95% 100%
+  );
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 </style>
