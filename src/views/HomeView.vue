@@ -1,13 +1,14 @@
 <template>
   <div class="tp-shell">
     <header class="topbar">
-      <div class="brand" aria-label="Satellite Time Series Browser">
+      <div class="brand" aria-label="Mississippi Crop Watch">
         <svg viewBox="0 0 32 32" aria-hidden="true">
-          <circle cx="16" cy="16" r="6.5" fill="var(--accent)" />
-          <ellipse cx="16" cy="16" rx="13.5" ry="6" stroke="var(--accent)" stroke-width="1.6" opacity=".82" transform="rotate(-28 16 16)" />
-          <circle cx="27" cy="9.5" r="1.8" fill="var(--accent-2)" />
+          <path d="M16 27V10" stroke="var(--accent-2)" stroke-width="2.2" stroke-linecap="round" />
+          <path d="M15.8 14.5C9.2 14.2 5.2 10.1 5 5.3c5.7-.4 10.3 2.6 11.7 8.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M17 18.5c6.4.2 10.1-3.6 10.4-8.2-5.6-.5-9.9 2.2-11.3 7.4" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M9 27h14" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" />
         </svg>
-        <div class="brand-title">Satellite Time Series Browser</div>
+        <div class="brand-title">Mississippi Crop Watch</div>
       </div>
 
       <form class="search" @submit.prevent="runSearch">
@@ -62,9 +63,6 @@
         </div>
       </div>
 
-      <div class="top-actions">
-        <button class="icon-btn" title="Share link" @click="copyShareLink">link</button>
-      </div>
     </header>
 
     <nav class="tool-rail" aria-label="Map tools">
@@ -109,7 +107,7 @@
 
     <main class="map-stage">
       <div ref="mapEl" class="map"></div>
-      <div v-if="!inspectorOpen" class="map-hint">Click anywhere on the map to analyze a Sentinel-2 time series</div>
+      <div v-if="!inspectorOpen" class="map-hint">Click in any field to analyze NDVI timeseries from Sentinel-2 satellite</div>
 
       <div class="basemap-switcher">
         <button
@@ -130,7 +128,6 @@
             <div class="meta">{{ sceneCountLabel }}</div>
           </div>
           <div class="head-actions">
-            <button class="icon-btn" title="Copy link" @click="copyShareLink">link</button>
             <button class="icon-btn" title="Close inspector" @click="closeInspector">x</button>
           </div>
         </div>
@@ -142,6 +139,7 @@
               <span class="segmented">
                 <button :class="{ active: previewLayer === 'TRUE-COLOR' }" @click="previewLayer = 'TRUE-COLOR'">True</button>
                 <button :class="{ active: previewLayer === 'FALSE-COLOR' }" @click="previewLayer = 'FALSE-COLOR'">False</button>
+                <button :class="{ active: previewLayer === 'NDVI' }" @click="previewLayer = 'NDVI'">NDVI</button>
                 <template v-for="layer in activeClimateLayers" :key="layer.id">
                   <button
                     :class="{ active: previewLayer === layer.imageryMode }"
@@ -206,6 +204,17 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale" :style="{ background: NDVI_SCALE_BACKGROUND }">
+                  <span
+                    v-for="tick in NDVI_SCALE_TICKS"
+                    :key="tick.label"
+                    class="ndvi-scale-tick"
+                    :style="{ left: tick.left }"
+                  >
+                    {{ tick.label }}
+                  </span>
+                  <span class="ndvi-scale-title">NDVI</span>
+                </div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
@@ -246,7 +255,7 @@
               :flags="emptyFlags"
               :flag-labels="emptyFlagLabels"
               :selected-date="appStore.selectedDate"
-              :y-min="0"
+              :y-min="-1"
               :y-max="1"
               unit="NDVI"
               class="mini-chart"
@@ -312,6 +321,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAppStore } from '../stores/app'
 import { getDataSource } from '../config/datasources'
+import { NDVI_SCALE_BACKGROUND, NDVI_SCALE_TICKS } from '../config/ndviPalette'
 import { useTimeSeries } from '../composables/useTimeSeries'
 import TimeSeriesChart from '../plugins/timeSeries/TimeSeriesChart.vue'
 import { BASEMAPS, getBasemap, type BasemapId } from '../utils/basemap'
@@ -330,6 +340,8 @@ import {
   type ClimatePoint,
 } from '../services/climateApi'
 import type { Flags, FlagLabels } from '../types/state'
+import { loadMississippiFields, type FieldFeature } from '../services/fieldBoundaries'
+import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson'
 
 
 const appStore = useAppStore()
@@ -354,13 +366,13 @@ const startDate = ref(appStore.startDate)
 const endDate = ref(appStore.endDate)
 const pendingStart = ref(startDate.value)
 const pendingEnd = ref(endDate.value)
-const activePreset = ref('5y')
+const activePreset = ref('1y')
 
-const previewLayer = ref<string>('TRUE-COLOR')
+const previewLayer = ref<string>('NDVI')
 const sceneLoading = ref(false)
 const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
-const PREVIEW_DEFAULT_ZOOM = 16
+const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
@@ -373,7 +385,7 @@ const sceneDates = computed(() =>
 
 // Layers panel
 const layersPanelOpen = ref(false)
-const activeClimateIds = ref(new Set<string>())
+const activeClimateIds = ref(new Set(CLIMATE_LAYERS.map(layer => layer.id)))
 const activeClimateLayers = computed(() => CLIMATE_LAYERS.filter(l => activeClimateIds.value.has(l.id)))
 
 const climateData = reactive<Record<string, ClimatePoint[]>>({})
@@ -411,7 +423,7 @@ function toggleClimateLayer(id: string) {
     // Reset imagery if this layer's mode was active
     const removed = CLIMATE_LAYERS.find(l => l.id === id)
     if (removed && previewLayer.value === removed.imageryMode) {
-      previewLayer.value = 'TRUE-COLOR'
+      previewLayer.value = 'NDVI'
     }
   } else {
     next.add(id)
@@ -441,6 +453,15 @@ watch(() => appStore.coordinate, () => {
   updatePreviewMarker()
   centerPreviewMap(PREVIEW_DEFAULT_ZOOM)
 })
+
+watch(() => appStore.selectedField, () => {
+  fieldsLayer?.setStyle(feature => ({
+    color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+    weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+    fillOpacity: 0.08,
+  }))
+  updatePreviewFieldMask()
+}, { deep: true })
 
 function zoomImageIn() {
   previewMap?.zoomIn()
@@ -529,8 +550,13 @@ let map: L.Map | null = null
 let baseLayer: L.TileLayer | null = null
 let labelLayer: L.TileLayer | null = null
 let marker: L.Marker | null = null
+let fieldsLayer: L.GeoJSON | null = null
+let allFields: FeatureCollection<Polygon | MultiPolygon> | null = null
+let fieldsLoading = false
 let previewMap: L.Map | null = null
 let previewTileLayer: L.TileLayer | null = null
+let previewFieldMask: L.Polygon | null = null
+let previewFieldOutline: L.GeoJSON | null = null
 let previewMarker: L.Marker | null = null
 let previewResizeObserver: ResizeObserver | null = null
 let sceneRequestId = 0
@@ -542,6 +568,10 @@ const presets = [
   { id: '5y', label: 'Last 5 years', short: '5y' },
   { id: 'all', label: 'Full archive', short: '2015-' },
 ]
+
+const MISSISSIPPI_INITIAL_CENTER: L.LatLngExpression = [32.75, -89.7]
+const MISSISSIPPI_INITIAL_ZOOM = 7
+const FIELD_LOAD_ZOOM = 12
 
 const formattedCoordinate = computed(() => {
   const [lon, lat] = appStore.coordinate
@@ -622,6 +652,100 @@ function markerIcon() {
   })
 }
 
+function fieldCoordinates(feature: FieldFeature): number[][] {
+  return feature.geometry.type === 'Polygon'
+    ? feature.geometry.coordinates.flat()
+    : feature.geometry.coordinates.flat(2)
+}
+
+function fieldIntersectsMapBounds(feature: FieldFeature, bounds: L.LatLngBounds) {
+  return fieldCoordinates(feature).some(([lng, lat]) => bounds.contains([lat, lng]))
+}
+
+function pointInRing(lon: number, lat: number, ring: number[][]) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const crosses = ((yi > lat) !== (yj > lat)) && (lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)
+    if (crosses) inside = !inside
+  }
+  return inside
+}
+
+function fieldContainsPoint(feature: FieldFeature, lon: number, lat: number) {
+  const polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates
+  return polygons.some(polygon => {
+    const [outer, ...holes] = polygon
+    return Boolean(outer?.length && pointInRing(lon, lat, outer) && !holes.some(hole => pointInRing(lon, lat, hole)))
+  })
+}
+
+function fieldAtPoint(lon: number, lat: number): FieldFeature | null {
+  if (!allFields) return null
+  return (allFields.features as FieldFeature[]).find(feature => fieldContainsPoint(feature, lon, lat)) ?? null
+}
+
+function visibleFields() {
+  if (!map || !allFields) return null
+  const bounds = map.getBounds().pad(0.15)
+  return {
+    type: 'FeatureCollection' as const,
+    features: allFields.features.filter(feature => fieldIntersectsMapBounds(feature as FieldFeature, bounds)),
+  }
+}
+
+function renderVisibleFields() {
+  if (!map || !allFields) return
+  const visible = visibleFields()
+  fieldsLayer?.remove()
+  if (!visible?.features.length) {
+    fieldsLayer = null
+    return
+  }
+  fieldsLayer = L.geoJSON(visible, {
+    style: feature => ({
+      color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+      weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+      fillOpacity: 0.08,
+    }),
+    onEachFeature: (feature, layer) => {
+      layer.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e)
+        selectFieldFeature(feature as FieldFeature)
+      })
+    },
+  }).addTo(map)
+}
+
+async function updateFieldsLayerForZoom() {
+  if (!map) return
+  if (map.getZoom() < FIELD_LOAD_ZOOM) {
+    fieldsLayer?.remove()
+    fieldsLayer = null
+    return
+  }
+  if (allFields) {
+    renderVisibleFields()
+    return
+  }
+  if (fieldsLoading) return
+  fieldsLoading = true
+  try {
+    allFields = await loadMississippiFields()
+    renderVisibleFields()
+  } catch (e) {
+    showToast(`Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    fieldsLoading = false
+  }
+}
+
+async function loadFieldsLayer() {
+  if (!map) return
+  await updateFieldsLayerForZoom()
+}
+
 function previewMarkerIcon() {
   return L.divIcon({
     className: 'tp-preview-marker',
@@ -655,7 +779,8 @@ function centerMainMapOnPoint(lon: number, lat: number, zoom = map?.getZoom() ??
   else map.setView(center, zoom)
 }
 
-function setSelectedPoint(lon: number, lat: number, name = 'Selected location') {
+function setSelectedPoint(lon: number, lat: number, name = 'Selected location', field: FieldFeature | null = null) {
+  appStore.setSelectedField(field)
   appStore.setCoordinate(lon, lat)
   placeName.value = name
   inspectorOpen.value = true
@@ -668,6 +793,15 @@ function setSelectedPoint(lon: number, lat: number, name = 'Selected location') 
   updateUrl()
   loadSceneSummary()
   for (const id of activeClimateIds.value) fetchClimate(id)
+}
+
+function selectFieldFeature(field: FieldFeature, fitField = true) {
+  const layer = L.geoJSON(field)
+  const bounds = layer.getBounds()
+  layer.remove()
+  const center = bounds.getCenter()
+  setSelectedPoint(center.lng, center.lat, `Field ${field.properties.fieldId}`, field)
+  if (fitField) map?.fitBounds(bounds, { padding: [40, 40] })
 }
 
 async function ensurePreviewMap() {
@@ -708,6 +842,43 @@ function updatePreviewMarker() {
   previewMarker?.setLatLng([lat, lon])
 }
 
+function fieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
+  const polygons = field.geometry.type === 'Polygon' ? [field.geometry.coordinates] : field.geometry.coordinates
+  return polygons
+    .map(polygon => polygon[0]?.map(([lng, lat]) => [lat, lng] as L.LatLngExpression) ?? [])
+    .filter(ring => ring.length > 0)
+}
+
+function updatePreviewFieldMask() {
+  previewFieldMask?.remove()
+  previewFieldOutline?.remove()
+  previewFieldMask = null
+  previewFieldOutline = null
+
+  if (!previewMap || previewLayer.value !== 'NDVI' || !appStore.selectedField) return
+
+  const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
+  const cropRings = fieldExteriorRings(appStore.selectedField)
+  if (!cropRings.length) return
+
+  previewFieldMask = L.polygon([worldRing, ...cropRings], {
+    stroke: false,
+    fillColor: '#132033',
+    fillOpacity: 0.82,
+    fillRule: 'evenodd',
+    interactive: false,
+  }).addTo(previewMap)
+
+  previewFieldOutline = L.geoJSON(appStore.selectedField, {
+    interactive: false,
+    style: {
+      color: '#FFC145',
+      weight: 2,
+      fillOpacity: 0,
+    },
+  }).addTo(previewMap)
+}
+
 function centerPreviewMap(zoom = previewTileZoom.value) {
   if (!previewMap) return
   const [lon, lat] = appStore.coordinate
@@ -740,6 +911,7 @@ async function updatePreviewImagery() {
     }
 
     updatePreviewMarker()
+    updatePreviewFieldMask()
     previewMarker?.bringToFront()
     centerPreviewMap(previewTileZoom.value)
   } catch (e) {
@@ -756,6 +928,8 @@ function destroyPreviewMap() {
   previewMap?.remove()
   previewMap = null
   previewTileLayer = null
+  previewFieldMask = null
+  previewFieldOutline = null
   previewMarker = null
 }
 
@@ -859,16 +1033,6 @@ function focusSearch() {
   searchInput.value?.focus()
 }
 
-async function copyShareLink() {
-  updateUrl()
-  try {
-    await navigator.clipboard.writeText(window.location.href)
-    showToast('Share link copied.')
-  } catch {
-    showToast('Could not copy link.')
-  }
-}
-
 function showToast(message: string) {
   toast.value = message
   window.setTimeout(() => {
@@ -897,7 +1061,7 @@ function onWindowResize() {
 }
 
 onMounted(() => {
-  if (appStore.theme !== 'dark') appStore.theme = 'dark'
+  if (appStore.theme !== 'light') appStore.theme = 'light'
   if (!mapEl.value) return
   const [lon, lat] = appStore.coordinate
   const def = getBasemap(activeBasemap.value)
@@ -905,7 +1069,7 @@ onMounted(() => {
     zoomControl: false,
     attributionControl: true,
     worldCopyJump: true,
-  }).setView([lat, lon], inspectorOpen.value ? 13 : 3)
+  }).setView(inspectorOpen.value ? [lat, lon] : MISSISSIPPI_INITIAL_CENTER, inspectorOpen.value ? 13 : MISSISSIPPI_INITIAL_ZOOM)
   L.control.zoom({ position: 'topright' }).addTo(map)
   baseLayer = L.tileLayer(def.url, def.options).addTo(map)
   if (def.labelUrl) {
@@ -914,18 +1078,29 @@ onMounted(() => {
 
   map.on('click', (e: L.LeafletMouseEvent) => {
     const { lng, lat } = e.latlng.wrap()
-    setSelectedPoint(lng, lat)
+    const field = fieldAtPoint(lng, lat)
+    if (field) {
+      selectFieldFeature(field)
+      return
+    }
+    setSelectedPoint(lng, lat, 'Selected location', null)
   })
   map.on('mousemove', (e: L.LeafletMouseEvent) => {
     statusCoordinate.value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
   })
-  map.on('zoomend', () => { mapZoom.value = map?.getZoom() ?? mapZoom.value })
+  map.on('zoomend moveend', () => {
+    mapZoom.value = map?.getZoom() ?? mapZoom.value
+    updateFieldsLayerForZoom()
+  })
   mapZoom.value = map.getZoom()
+
+  loadFieldsLayer()
 
   if (inspectorOpen.value) {
     marker = L.marker([lat, lon], { icon: markerIcon() }).addTo(map)
     centerMainMapOnPoint(lon, lat, 13, false)
     loadSceneSummary()
+    for (const id of activeClimateIds.value) fetchClimate(id)
   }
 
   document.addEventListener('click', onDocumentClick, true)
@@ -969,6 +1144,7 @@ onUnmounted(() => {
   gap: 16px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   z-index: 1200;
 }
@@ -1001,6 +1177,7 @@ onUnmounted(() => {
   height: 34px;
   padding: 0 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
@@ -1119,7 +1296,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 8px;
@@ -1148,13 +1325,6 @@ onUnmounted(() => {
   border-color: rgba(54, 226, 164, 0.35);
   color: var(--accent);
 }
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
 
 .icon-btn {
   display: grid;
@@ -1244,10 +1414,10 @@ onUnmounted(() => {
   transform: translateX(-50%);
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(18, 24, 38, 0.88);
-  color: var(--text-secondary);
+  background: rgba(26, 38, 56, 0.72);
+  backdrop-filter: blur(12px);
+  color: var(--accent);
   padding: 8px 16px;
-  backdrop-filter: blur(8px);
 }
 
 .basemap-switcher {
@@ -1289,6 +1459,7 @@ onUnmounted(() => {
   width: 50vw;
   height: 100%;
   background: var(--bg-panel);
+  backdrop-filter: blur(16px);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-pop);
   transform: translateX(100%);
@@ -1339,6 +1510,7 @@ onUnmounted(() => {
   margin-bottom: 14px;
   padding: 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -1564,7 +1736,7 @@ onUnmounted(() => {
 .chart-skeleton,
 .release-skeleton,
 .image-skeleton {
-  background: linear-gradient(90deg, var(--bg-panel-2) 25%, #202a3a 37%, var(--bg-panel-2) 63%);
+  background: linear-gradient(90deg, var(--bg-panel-2) 25%, rgba(255, 200, 0, 0.32) 37%, var(--bg-panel-2) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.35s ease infinite;
   border-radius: var(--radius-sm);
@@ -1595,7 +1767,6 @@ onUnmounted(() => {
   color: var(--error);
 }
 
-
 .statusbar {
   grid-area: status;
   display: flex;
@@ -1603,6 +1774,7 @@ onUnmounted(() => {
   gap: 18px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -1879,5 +2051,40 @@ onUnmounted(() => {
   .inspector.open {
     transform: translateY(0);
   }
+}
+</style>
+
+
+<style scoped>
+.ndvi-scale {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 34px;
+  z-index: 500;
+  display: block;
+  min-height: 28px;
+  padding: 15px 8px 3px;
+  border-radius: 999px;
+  color: #102113;
+  font-size: 0.6rem;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+.ndvi-scale-title {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+}
+
+.ndvi-scale-tick {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.65);
 }
 </style>
