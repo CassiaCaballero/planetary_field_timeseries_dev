@@ -63,9 +63,6 @@
         </div>
       </div>
 
-      <div class="top-actions">
-        <button class="icon-btn" title="Share link" @click="copyShareLink">link</button>
-      </div>
     </header>
 
     <nav class="tool-rail" aria-label="Map tools">
@@ -131,7 +128,6 @@
             <div class="meta">{{ sceneCountLabel }}</div>
           </div>
           <div class="head-actions">
-            <button class="icon-btn" title="Copy link" @click="copyShareLink">link</button>
             <button class="icon-btn" title="Close inspector" @click="closeInspector">x</button>
           </div>
         </div>
@@ -1072,16 +1068,6 @@ function focusSearch() {
   searchInput.value?.focus()
 }
 
-async function copyShareLink() {
-  updateUrl()
-  try {
-    await navigator.clipboard.writeText(window.location.href)
-    showToast('Share link copied.')
-  } catch {
-    showToast('Could not copy link.')
-  }
-}
-
 function showToast(message: string) {
   toast.value = message
   window.setTimeout(() => {
@@ -1374,13 +1360,6 @@ onUnmounted(() => {
   border-color: rgba(54, 226, 164, 0.35);
   color: var(--accent);
 }
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
 
 .icon-btn {
   display: grid;
