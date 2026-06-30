@@ -1,42 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-base: #0A0E16;
-  --bg-panel: #121826;
-  --bg-panel-2: #19212F;
-  --bg-elevated: #1E2838;
+  --bg-base: #F7F2D5;
+  --bg-panel: rgba(255, 252, 232, 0.92);
+  --bg-panel-2: rgba(255, 200, 0, 0.16);
+  --bg-elevated: rgba(255, 255, 244, 0.94);
 
-  --border: #283446;
-  --border-strong: #38465C;
+  --border: rgba(36, 79, 38, 0.22);
+  --border-strong: rgba(36, 79, 38, 0.42);
   --border-mid: var(--border-strong);
 
-  --text-primary: #EAEEF6;
-  --text-secondary: #9AA6BC;
-  --text-muted: #65728A;
+  --text-primary: #244F26;
+  --text-secondary: rgba(36, 79, 38, 0.78);
+  --text-muted: rgba(36, 79, 38, 0.58);
 
-  --accent: #36E2A4;
-  --accent-hover: #57F0B6;
-  --accent-dim: rgba(54, 226, 164, 0.14);
-  --accent-2: #4DA6FF;
+  --accent: #FFC800;
+  --accent-hover: #FFD84A;
+  --accent-dim: rgba(255, 200, 0, 0.22);
+  --accent-2: #244F26;
 
-  --warn: #F2B23E;
+  --warn: #FFC800;
   --error: #FF6B6B;
-  --good: #36E2A4;
+  --good: #244F26;
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.45);
-  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --shadow-1: 0 1px 2px rgba(36, 79, 38, 0.14);
+  --shadow-2: 0 8px 28px rgba(36, 79, 38, 0.16);
+  --shadow-pop: 0 12px 40px rgba(36, 79, 38, 0.22);
 
-  --font-ui: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-ui: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Montserrat", ui-monospace, SFMono-Regular, Consolas, monospace;
 
   /* Backwards-compatible aliases used by the existing dockview panels. */
   --bg: var(--bg-base);
   --bg-input: var(--bg-panel-2);
-  --bg-hover: #223047;
+  --bg-hover: rgba(255, 200, 0, 0.28);
   --text: var(--text-primary);
   --text-sub: var(--text-secondary);
   --green: var(--good);
@@ -44,16 +44,16 @@
   --orange: var(--warn);
   --cyan: var(--accent-2);
   --mauve: #B394FF;
-  --yellow: #F4D35E;
+  --yellow: #FFC800;
   --rosewater: #FF8FA3;
   --bg-error: rgba(255, 107, 107, 0.14);
-  --bg-success: rgba(54, 226, 164, 0.13);
-  --bg-warning: rgba(242, 178, 62, 0.14);
-  --bg-overlay: rgba(5, 8, 13, 0.76);
+  --bg-success: rgba(36, 79, 38, 0.12);
+  --bg-warning: rgba(255, 200, 0, 0.18);
+  --bg-overlay: rgba(36, 79, 38, 0.24);
 }
 
 [data-theme="light"] {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -95,7 +95,7 @@
 }
 
 .leaflet-control-attribution {
-  background: rgba(10, 14, 22, 0.72) !important;
+  background: rgba(255, 252, 232, 0.82) !important;
   color: var(--text-muted) !important;
   font-family: var(--font-ui);
 }
