@@ -1,14 +1,14 @@
 <template>
   <div class="tp-shell">
     <header class="topbar">
-      <div class="brand" aria-label="Crops of Magnolia">
+      <div class="brand" aria-label="Mississippi Crop Watch">
         <svg viewBox="0 0 32 32" aria-hidden="true">
           <path d="M16 27V10" stroke="var(--accent-2)" stroke-width="2.2" stroke-linecap="round" />
           <path d="M15.8 14.5C9.2 14.2 5.2 10.1 5 5.3c5.7-.4 10.3 2.6 11.7 8.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M17 18.5c6.4.2 10.1-3.6 10.4-8.2-5.6-.5-9.9 2.2-11.3 7.4" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M9 27h14" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" />
         </svg>
-        <div class="brand-title">Crops of Magnolia</div>
+        <div class="brand-title">Mississippi Crop Watch</div>
       </div>
 
       <form class="search" @submit.prevent="runSearch">
@@ -208,7 +208,17 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
-                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale"><span>-1</span><span>NDVI</span><span>1</span></div>
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale">
+                  <span
+                    v-for="tick in NDVI_SCALE_TICKS"
+                    :key="tick.label"
+                    class="ndvi-scale-tick"
+                    :style="{ left: tick.left }"
+                  >
+                    {{ tick.label }}
+                  </span>
+                  <span class="ndvi-scale-title">NDVI</span>
+                </div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
@@ -361,12 +371,19 @@ const pendingStart = ref(startDate.value)
 const pendingEnd = ref(endDate.value)
 const activePreset = ref('1y')
 
-const previewLayer = ref<string>('TRUE-COLOR')
+const previewLayer = ref<string>('NDVI')
 const sceneLoading = ref(false)
 const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
 const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
+const NDVI_SCALE_TICKS = Array.from({ length: 21 }, (_, index) => {
+  const value = Number((-1 + index * 0.1).toFixed(1))
+  return {
+    label: value.toString(),
+    left: index === 0 ? '10px' : index === 20 ? 'calc(100% - 10px)' : `${index * 5}%`,
+  }
+})
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
 const sceneDates = computed(() =>
@@ -378,7 +395,7 @@ const sceneDates = computed(() =>
 
 // Layers panel
 const layersPanelOpen = ref(false)
-const activeClimateIds = ref(new Set<string>())
+const activeClimateIds = ref(new Set(CLIMATE_LAYERS.map(layer => layer.id)))
 const activeClimateLayers = computed(() => CLIMATE_LAYERS.filter(l => activeClimateIds.value.has(l.id)))
 
 const climateData = reactive<Record<string, ClimatePoint[]>>({})
@@ -416,7 +433,7 @@ function toggleClimateLayer(id: string) {
     // Reset imagery if this layer's mode was active
     const removed = CLIMATE_LAYERS.find(l => l.id === id)
     if (removed && previewLayer.value === removed.imageryMode) {
-      previewLayer.value = 'TRUE-COLOR'
+      previewLayer.value = 'NDVI'
     }
   } else {
     next.add(id)
@@ -857,7 +874,7 @@ function updatePreviewFieldMask() {
   previewFieldMask = L.polygon([worldRing, ...cropRings], {
     stroke: false,
     fillColor: '#132033',
-    fillOpacity: 1,
+    fillOpacity: 0.82,
     fillRule: 'evenodd',
     interactive: false,
   }).addTo(previewMap)
@@ -1103,6 +1120,7 @@ onMounted(() => {
     marker = L.marker([lat, lon], { icon: markerIcon() }).addTo(map)
     centerMainMapOnPoint(lon, lat, 13, false)
     loadSceneSummary()
+    for (const id of activeClimateIds.value) fetchClimate(id)
   }
 
   document.addEventListener('click', onDocumentClick, true)
@@ -2071,13 +2089,12 @@ onUnmounted(() => {
   right: 12px;
   bottom: 34px;
   z-index: 500;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
+  display: block;
+  min-height: 28px;
+  padding: 15px 8px 3px;
   border-radius: 999px;
   color: #102113;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 700;
   background: linear-gradient(
     to right,
@@ -2103,5 +2120,21 @@ onUnmounted(() => {
     #006837 95% 100%
   );
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+.ndvi-scale-title {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+}
+
+.ndvi-scale-tick {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.65);
 }
 </style>
