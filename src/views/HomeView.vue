@@ -836,7 +836,7 @@ function selectFieldFeature(field: FieldFeature, fitField = true) {
   layer.remove()
   const center = bounds.getCenter()
   setSelectedPoint(center.lng, center.lat, `Field ${field.properties.fieldId}`, field)
-  if (fitField) map?.fitBounds(bounds, { padding: [40, 40] })
+  if (fitField) map?.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
 }
 
 async function ensurePreviewMap() {
