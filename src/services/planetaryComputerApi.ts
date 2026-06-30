@@ -228,7 +228,7 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
       params.append('assets', 'B08')
       params.append('assets', 'B04')
       params.set('asset_as_band', 'true')
-      params.set('expression', '(B08_b1-B04_b1)/(B08_b1+B04_b1)')
+      params.set('expression', '(floor(((((B08*1.0)-B04)/((B08*1.0)+B04))+1)*10)/10)-1')
       params.set('rescale', '-1,1')
       params.set('colormap_name', 'rdylgn')
       break
@@ -236,7 +236,7 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
       params.append('assets', 'B03')
       params.append('assets', 'B08')
       params.set('asset_as_band', 'true')
-      params.set('expression', '(B03_b1-B08_b1)/(B03_b1+B08_b1)')
+      params.set('expression', '(B03-B08)/(B03+B08)')
       params.set('rescale', '-1,1')
       params.set('colormap_name', 'rdbu_r')
       break
