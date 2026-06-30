@@ -1110,7 +1110,7 @@ function onWindowResize() {
 }
 
 onMounted(() => {
-  if (appStore.theme !== 'dark') appStore.theme = 'dark'
+  if (appStore.theme !== 'light') appStore.theme = 'light'
   if (!mapEl.value) return
   const [lon, lat] = appStore.coordinate
   const def = getBasemap(activeBasemap.value)
@@ -1345,7 +1345,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 8px;
@@ -1792,7 +1792,7 @@ onUnmounted(() => {
 .chart-skeleton,
 .release-skeleton,
 .image-skeleton {
-  background: linear-gradient(90deg, var(--bg-panel-2) 25%, #202a3a 37%, var(--bg-panel-2) 63%);
+  background: linear-gradient(90deg, var(--bg-panel-2) 25%, rgba(255, 200, 0, 0.32) 37%, var(--bg-panel-2) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.35s ease infinite;
   border-radius: var(--radius-sm);

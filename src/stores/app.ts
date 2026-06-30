@@ -9,7 +9,7 @@ const oneYearAgo = new Date(Date.now() - 365.25 * 24 * 3600 * 1000).toISOString(
 export const useAppStore = defineStore('app', () => {
   const CYCLE: Array<'system' | 'dark' | 'light'> = ['system', 'dark', 'light']
   const stored = localStorage.getItem('theme') as 'system' | 'dark' | 'light' | null
-  const theme = ref<'system' | 'dark' | 'light'>(stored ?? 'dark')
+  const theme = ref<'system' | 'dark' | 'light'>(stored ?? 'light')
 
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
   const systemPrefersDark = ref(mq.matches)
