@@ -1,4 +1,5 @@
 import type { BandTimeSeries, RawBands } from '../types/api'
+import { NDVI_TITILER_COLORMAP } from '../config/ndviPalette'
 
 const PC_STAC_BASE = import.meta.env.VITE_PC_STAC_BASE || 'https://planetarycomputer.microsoft.com/api/stac/v1'
 const PC_TILER_BASE = import.meta.env.VITE_PC_TILER_BASE || 'https://planetarycomputer.microsoft.com/api/data/v1'
@@ -228,9 +229,9 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
       params.append('assets', 'B08')
       params.append('assets', 'B04')
       params.set('asset_as_band', 'true')
-      params.set('expression', '(floor(((((B08*1.0)-B04)/((B08*1.0)+B04))+1)*10)/10)-1')
-      params.set('rescale', '-1,1')
-      params.set('colormap_name', 'rdylgn_r')
+      params.set('expression', 'floor(floor(((((B08*1.0)-B04)/((B08*1.0)+B04))+1)*10)*12.75)')
+      params.set('rescale', '0,255')
+      params.set('colormap', JSON.stringify(NDVI_TITILER_COLORMAP))
       break
     case 'NDWI':
       params.append('assets', 'B03')
