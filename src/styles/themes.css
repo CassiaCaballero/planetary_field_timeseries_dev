@@ -1,10 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-base: #F7F2D5;
-  --bg-panel: rgba(255, 252, 232, 0.92);
-  --bg-panel-2: rgba(255, 200, 0, 0.16);
-  --bg-elevated: rgba(255, 255, 244, 0.94);
+  --bg-base: #F3F4F0;
+  --bg-panel: rgba(248, 249, 245, 0.94);
+  --bg-panel-2: rgba(232, 235, 228, 0.88);
+  --bg-elevated: rgba(255, 255, 255, 0.96);
 
   --border: rgba(36, 79, 38, 0.22);
   --border-strong: rgba(36, 79, 38, 0.42);
@@ -16,7 +16,7 @@
 
   --accent: #FFC800;
   --accent-hover: #FFD84A;
-  --accent-dim: rgba(255, 200, 0, 0.22);
+  --accent-dim: rgba(36, 79, 38, 0.12);
   --accent-2: #244F26;
 
   --warn: #FFC800;
@@ -36,7 +36,7 @@
   /* Backwards-compatible aliases used by the existing dockview panels. */
   --bg: var(--bg-base);
   --bg-input: var(--bg-panel-2);
-  --bg-hover: rgba(255, 200, 0, 0.28);
+  --bg-hover: rgba(36, 79, 38, 0.10);
   --text: var(--text-primary);
   --text-sub: var(--text-secondary);
   --green: var(--good);
@@ -48,7 +48,7 @@
   --rosewater: #FF8FA3;
   --bg-error: rgba(255, 107, 107, 0.14);
   --bg-success: rgba(36, 79, 38, 0.12);
-  --bg-warning: rgba(255, 200, 0, 0.18);
+  --bg-warning: rgba(232, 235, 228, 0.92);
   --bg-overlay: rgba(36, 79, 38, 0.24);
 }
 
@@ -95,7 +95,7 @@
 }
 
 .leaflet-control-attribution {
-  background: rgba(255, 252, 232, 0.82) !important;
+  background: rgba(248, 249, 245, 0.86) !important;
   color: var(--text-muted) !important;
   font-family: var(--font-ui);
 }

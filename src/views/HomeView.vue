@@ -1771,7 +1771,7 @@ onUnmounted(() => {
 .chart-skeleton,
 .release-skeleton,
 .image-skeleton {
-  background: linear-gradient(90deg, var(--bg-panel-2) 25%, rgba(255, 200, 0, 0.32) 37%, var(--bg-panel-2) 63%);
+  background: linear-gradient(90deg, var(--bg-panel-2) 25%, rgba(36, 79, 38, 0.10) 37%, var(--bg-panel-2) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.35s ease infinite;
   border-radius: var(--radius-sm);
