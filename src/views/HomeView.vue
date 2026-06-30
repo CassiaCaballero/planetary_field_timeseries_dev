@@ -208,7 +208,7 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
-                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale">
+                <div v-if="previewLayer === 'NDVI'" class="ndvi-scale" :style="{ background: NDVI_SCALE_BACKGROUND }">
                   <span
                     v-for="tick in NDVI_SCALE_TICKS"
                     :key="tick.label"
@@ -377,11 +377,39 @@ const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
 const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
-const NDVI_SCALE_TICKS = Array.from({ length: 21 }, (_, index) => {
+const NDVI_SCALE_COLORS = [
+  '#a50026',
+  '#b71126',
+  '#c82227',
+  '#d9342a',
+  '#e64a33',
+  '#f46d43',
+  '#fa8c59',
+  '#fdae61',
+  '#fec980',
+  '#fee08b',
+  '#ffffbf',
+  '#e6f598',
+  '#d9ef8b',
+  '#c5e67e',
+  '#a6d96a',
+  '#82c966',
+  '#66bd63',
+  '#41ab5d',
+  '#1a9850',
+  '#0b7d42',
+  '#006837',
+]
+const NDVI_SCALE_BACKGROUND = `linear-gradient(to right, ${NDVI_SCALE_COLORS.map((color, index) => {
+  const start = (index / NDVI_SCALE_COLORS.length) * 100
+  const end = ((index + 1) / NDVI_SCALE_COLORS.length) * 100
+  return `${color} ${start}% ${end}%`
+}).join(', ')})`
+const NDVI_SCALE_TICKS = NDVI_SCALE_COLORS.map((_, index) => {
   const value = Number((-1 + index * 0.1).toFixed(1))
   return {
     label: value.toString(),
-    left: index === 0 ? '10px' : index === 20 ? 'calc(100% - 10px)' : `${index * 5}%`,
+    left: `${((index + 0.5) / NDVI_SCALE_COLORS.length) * 100}%`,
   }
 })
 
@@ -2096,29 +2124,6 @@ onUnmounted(() => {
   color: #102113;
   font-size: 0.6rem;
   font-weight: 700;
-  background: linear-gradient(
-    to right,
-    #a50026 0% 5%,
-    #b91529 5% 10%,
-    #cc2929 10% 15%,
-    #df402f 15% 20%,
-    #ed5b3a 20% 25%,
-    #f77a4a 25% 30%,
-    #fb9658 30% 35%,
-    #fdb66d 35% 40%,
-    #fed184 40% 45%,
-    #feeb9d 45% 50%,
-    #ffffbf 50% 55%,
-    #edf8a3 55% 60%,
-    #d8ef8a 60% 65%,
-    #bfe47a 65% 70%,
-    #a6d96a 70% 75%,
-    #8acc62 75% 80%,
-    #66bd63 80% 85%,
-    #45ad5b 85% 90%,
-    #1a9850 90% 95%,
-    #006837 95% 100%
-  );
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 
