@@ -32,6 +32,14 @@ function medianFromStats(stats: any): number | null {
   )
 }
 
+function meanFromStats(stats: any): number | null {
+  return firstNumber(stats?.mean, stats?.avg)
+}
+
+function stddevFromStats(stats: any): number | null {
+  return firstNumber(stats?.std, stats?.stddev, stats?.stdev, stats?.standard_deviation)
+}
+
 function statisticsRoot(json: any): any {
   return json?.features?.[0]?.properties?.statistics
     ?? json?.features?.[0]?.properties
@@ -53,6 +61,16 @@ function firstStats(root: any, ...names: string[]): any {
     if (stats) return stats
   }
   return root?.b1 ?? root?.['1'] ?? root
+}
+
+function findStatsObject(value: any): any {
+  if (!value || typeof value !== 'object') return null
+  if (meanFromStats(value) != null && stddevFromStats(value) != null) return value
+  for (const child of Object.values(value)) {
+    const found = findStatsObject(child)
+    if (found) return found
+  }
+  return null
 }
 
 function parseStats(json: any): RawBands {
@@ -127,10 +145,32 @@ export interface NdviFieldSummary {
 
 function parseNdviSummary(json: any): NdviFieldSummary | null {
   const root = statisticsRoot(json)
-  const stats = firstStats(root, 'expression', 'expr', 'NDVI', 'ndvi')
-  const mean = firstNumber(stats?.mean, stats?.avg)
-  const stddev = firstNumber(stats?.std, stats?.stddev, stats?.stdev, stats?.standard_deviation)
+  const stats = firstStats(root, 'expression', 'expr', 'NDVI', 'ndvi') ?? findStatsObject(root)
+  const mean = meanFromStats(stats)
+  const stddev = stddevFromStats(stats)
   return mean == null || stddev == null ? null : { mean, stddev }
+}
+
+function parseBandNdviSummary(json: any): NdviFieldSummary | null {
+  const root = statisticsRoot(json)
+  const redStats = statsForBand(root, 'B04')
+  const nirStats = statsForBand(root, 'B08')
+  const redMean = meanFromStats(redStats)
+  const nirMean = meanFromStats(nirStats)
+  if (redMean == null || nirMean == null) return null
+
+  const red = redMean / REFLECTANCE_SCALE
+  const nir = nirMean / REFLECTANCE_SCALE
+  const denominator = nir + red
+  if (!denominator) return null
+
+  const redStd = (stddevFromStats(redStats) ?? 0) / REFLECTANCE_SCALE
+  const nirStd = (stddevFromStats(nirStats) ?? 0) / REFLECTANCE_SCALE
+  const mean = (nir - red) / denominator
+  const dNir = (2 * red) / (denominator * denominator)
+  const dRed = (-2 * nir) / (denominator * denominator)
+  const stddev = Math.sqrt((dNir * nirStd) ** 2 + (dRed * redStd) ** 2)
+  return { mean, stddev }
 }
 
 async function postNdviSummary(url: string, body: unknown): Promise<NdviFieldSummary | null> {
@@ -147,17 +187,39 @@ async function postNdviSummary(url: string, body: unknown): Promise<NdviFieldSum
   }
 }
 
-export async function fetchFieldNdviSummary(item: PcStacItem, field: FieldFeature): Promise<NdviFieldSummary | null> {
-  const params = new URLSearchParams()
-  params.set('collection', item.collection)
-  params.set('item', item.id)
-  params.append('assets', 'B08')
-  params.append('assets', 'B04')
-  params.set('asset_as_band', 'true')
-  params.set('expression', '((B08*1.0)-B04)/((B08*1.0)+B04)')
-  params.set('max_size', '256')
+async function postBandNdviSummary(url: string, body: unknown): Promise<NdviFieldSummary | null> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) return null
+    return parseBandNdviSummary(await res.json())
+  } catch {
+    return null
+  }
+}
 
-  const url = `${PC_TILER_BASE}/item/statistics?${params.toString()}`
+export async function fetchFieldNdviSummary(item: PcStacItem, field: FieldFeature): Promise<NdviFieldSummary | null> {
+  const expressionParams = new URLSearchParams()
+  expressionParams.set('collection', item.collection)
+  expressionParams.set('item', item.id)
+  expressionParams.append('assets', 'B08')
+  expressionParams.append('assets', 'B04')
+  expressionParams.set('asset_as_band', 'true')
+  expressionParams.set('expression', '((B08*1.0)-B04)/((B08*1.0)+B04)')
+  expressionParams.set('max_size', '256')
+
+  const bandParams = new URLSearchParams()
+  bandParams.set('collection', item.collection)
+  bandParams.set('item', item.id)
+  bandParams.append('assets', 'B08')
+  bandParams.append('assets', 'B04')
+  bandParams.set('max_size', '256')
+
+  const expressionUrl = `${PC_TILER_BASE}/item/statistics?${expressionParams.toString()}`
+  const bandUrl = `${PC_TILER_BASE}/item/statistics?${bandParams.toString()}`
   const safeField: FieldFeature = {
     type: 'Feature',
     geometry: field.geometry,
@@ -165,8 +227,10 @@ export async function fetchFieldNdviSummary(item: PcStacItem, field: FieldFeatur
   }
   const collectionBody: FeatureCollection = { type: 'FeatureCollection', features: [safeField] }
 
-  return await postNdviSummary(url, collectionBody)
-    ?? await postNdviSummary(url, safeField)
+  return await postNdviSummary(expressionUrl, collectionBody)
+    ?? await postNdviSummary(expressionUrl, safeField)
+    ?? await postBandNdviSummary(bandUrl, collectionBody)
+    ?? await postBandNdviSummary(bandUrl, safeField)
 }
 
 function centroid(field: FieldFeature): [number, number] {
