@@ -236,11 +236,19 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
     case 'SCL_CLOUD_MASK':
       params.append('assets', 'SCL')
       params.set('asset_as_band', 'true')
-      params.set('expression', 'where((SCL==3) | (SCL==7) | (SCL==8) | (SCL==9) | (SCL==10) | (SCL==11), 1, 0)')
-      params.set('rescale', '0,1')
       params.set('colormap', JSON.stringify({
         0: [0, 0, 0, 0],
-        1: [232, 232, 232, 255],
+        1: [0, 0, 0, 0],
+        2: [0, 0, 0, 0],
+        3: [232, 232, 232, 255],
+        4: [0, 0, 0, 0],
+        5: [0, 0, 0, 0],
+        6: [0, 0, 0, 0],
+        7: [232, 232, 232, 255],
+        8: [232, 232, 232, 255],
+        9: [232, 232, 232, 255],
+        10: [232, 232, 232, 255],
+        11: [232, 232, 232, 255],
       }))
       break
     case 'NDWI':
