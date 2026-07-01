@@ -105,7 +105,7 @@
       </div>
     </aside>
 
-    <main class="map-stage">
+    <main class="map-stage" :class="{ 'inspector-open': inspectorOpen }">
       <div ref="mapEl" class="map"></div>
       <div v-if="!inspectorOpen" class="map-hint">Click in any field to analyze NDVI timeseries from Sentinel-2 satellite</div>
 
@@ -119,20 +119,8 @@
           {{ b.label }}
         </button>
       </div>
-
-      <aside ref="inspectorEl" class="inspector" :class="{ open: inspectorOpen }" aria-label="Location inspector">
-        <div class="inspector-head">
-          <div>
-            <div class="place">{{ placeName }}</div>
-            <div class="coord mono">{{ formattedCoordinate }}</div>
-            <div class="meta">{{ sceneCountLabel }}</div>
-          </div>
-          <div class="head-actions">
-            <button class="icon-btn" title="Close inspector" @click="closeInspector">x</button>
-          </div>
-        </div>
-
-        <div class="inspector-body">
+      <div class="imagery-dock">
+        <div class="imagery-dock-scroll">
           <section class="panel-card">
             <h3>
               Imagery
@@ -254,7 +242,22 @@
             </div>
             <p v-else class="empty">No cloud-free scenes found in this date range.</p>
           </section>
+        </div>
+      </div>
 
+      <aside ref="inspectorEl" class="inspector" :class="{ open: inspectorOpen }" aria-label="Location inspector">
+        <div class="inspector-head">
+          <div>
+            <div class="place">{{ placeName }}</div>
+            <div class="coord mono">{{ formattedCoordinate }}</div>
+            <div class="meta">{{ sceneCountLabel }}</div>
+          </div>
+          <div class="head-actions">
+            <button class="icon-btn" title="Close inspector" @click="closeInspector">x</button>
+          </div>
+        </div>
+
+        <div class="inspector-body">
           <section class="panel-card">
             <h3>
               NDVI time series
@@ -1158,6 +1161,14 @@ function onWindowResize() {
   recenterSelectedPointInBasemap(false)
 }
 
+watch(inspectorOpen, () => {
+  nextTick(() => {
+    map?.invalidateSize()
+    previewMap?.invalidateSize()
+    recenterSelectedPointInBasemap(false)
+  })
+})
+
 onMounted(() => {
   if (appStore.theme !== 'light') appStore.theme = 'light'
   if (!mapEl.value) return
@@ -1487,11 +1498,46 @@ onUnmounted(() => {
   grid-area: main;
   position: relative;
   overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .map {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+}
+
+.map-stage.inspector-open {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 50vw);
+  grid-template-rows: minmax(0, 1fr) minmax(260px, 38vh);
+  grid-template-areas:
+    "map inspector"
+    "imagery inspector";
+}
+
+.map-stage.inspector-open .map {
+  grid-area: map;
+}
+
+.imagery-dock {
+  display: none;
+}
+
+.map-stage.inspector-open .imagery-dock {
+  grid-area: imagery;
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-base);
+  border-top: 1px solid var(--border);
+}
+
+.imagery-dock-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px;
 }
 
 :deep(.tp-marker span) {
@@ -1532,6 +1578,10 @@ onUnmounted(() => {
   box-shadow: var(--shadow-2);
 }
 
+.map-stage.inspector-open .basemap-switcher {
+  bottom: calc(38vh + 42px);
+}
+
 .basemap-switcher button {
   border: 0;
   border-radius: var(--radius-sm);
@@ -1566,6 +1616,15 @@ onUnmounted(() => {
 
 .inspector.open {
   transform: translateX(0);
+}
+
+.map-stage.inspector-open .inspector.open {
+  position: relative;
+  grid-area: inspector;
+  top: auto;
+  right: auto;
+  width: 100%;
+  transform: none;
 }
 
 .inspector-head {
@@ -2136,6 +2195,23 @@ onUnmounted(() => {
     width: min(430px, calc(100vw - 24px));
   }
 
+  .map-stage.inspector-open {
+    display: block;
+  }
+
+  .map-stage.inspector-open .map {
+    position: absolute;
+    inset: 0;
+  }
+
+  .map-stage.inspector-open .imagery-dock {
+    display: none;
+  }
+
+  .map-stage.inspector-open .basemap-switcher {
+    bottom: 34px;
+  }
+
   .inspector {
     top: auto;
     bottom: 0;
@@ -2147,6 +2223,7 @@ onUnmounted(() => {
   }
 
   .inspector.open {
+    position: absolute;
     transform: translateY(0);
   }
 }
