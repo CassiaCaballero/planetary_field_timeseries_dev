@@ -221,12 +221,12 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
-                <div class="ndvi-scale" :style="{ background: NDVI_SCALE_BACKGROUND }">
+                <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
                   <span
                     v-for="tick in NDVI_SCALE_TICKS"
                     :key="tick.label"
                     class="ndvi-scale-tick"
-                    :style="{ left: tick.left }"
+                    :style="{ bottom: tick.left }"
                   >
                     {{ tick.label }}
                   </span>
@@ -353,7 +353,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAppStore } from '../stores/app'
 import { getDataSource } from '../config/datasources'
-import { NDVI_SCALE_BACKGROUND, NDVI_SCALE_TICKS } from '../config/ndviPalette'
+import { NDVI_SCALE_TICKS, NDVI_VERTICAL_SCALE_BACKGROUND } from '../config/ndviPalette'
 import { useTimeSeries } from '../composables/useTimeSeries'
 import TimeSeriesChart from '../plugins/timeSeries/TimeSeriesChart.vue'
 import { BASEMAPS, getBasemap, type BasemapId } from '../utils/basemap'
@@ -637,6 +637,8 @@ let previewRgbMap: L.Map | null = null
 let previewNdviMap: L.Map | null = null
 let previewRgbTileLayer: L.TileLayer | null = null
 let previewNdviTileLayer: L.TileLayer | null = null
+let previewRgbCloudLayer: L.TileLayer | null = null
+let previewNdviCloudLayer: L.TileLayer | null = null
 let previewFieldMask: L.Polygon | null = null
 let previewFieldOutline: L.GeoJSON | null = null
 let previewRgbMarker: L.Marker | null = null
@@ -1010,9 +1012,10 @@ async function updatePreviewImagery() {
   if (!previewRgbMap || !previewNdviMap || !selectedScene.value) return
 
   try {
-    const [rgbTileUrl, ndviTileUrl] = await Promise.all([
+    const [rgbTileUrl, ndviTileUrl, cloudMaskTileUrl] = await Promise.all([
       getTileUrl(selectedScene.value, satelliteRgbLayerMode()),
       getTileUrl(selectedScene.value, 'NDVI'),
+      getTileUrl(selectedScene.value, 'SCL_CLOUD_MASK'),
     ])
     if (requestId !== previewTileRequestId || !previewRgbMap || !previewNdviMap) return
 
@@ -1029,6 +1032,13 @@ async function updatePreviewImagery() {
 
     if (previewNdviTileLayer) previewNdviTileLayer.setUrl(ndviTileUrl)
     else previewNdviTileLayer = L.tileLayer(ndviTileUrl, tileOptions).addTo(previewNdviMap)
+
+    const cloudOptions = { ...tileOptions, opacity: 0.72 }
+    if (previewRgbCloudLayer) previewRgbCloudLayer.setUrl(cloudMaskTileUrl)
+    else previewRgbCloudLayer = L.tileLayer(cloudMaskTileUrl, cloudOptions).addTo(previewRgbMap)
+
+    if (previewNdviCloudLayer) previewNdviCloudLayer.setUrl(cloudMaskTileUrl)
+    else previewNdviCloudLayer = L.tileLayer(cloudMaskTileUrl, cloudOptions).addTo(previewNdviMap)
 
     updatePreviewMarker()
     updatePreviewFieldMask()
@@ -1052,6 +1062,8 @@ function destroyPreviewMap() {
   previewNdviMap = null
   previewRgbTileLayer = null
   previewNdviTileLayer = null
+  previewRgbCloudLayer = null
+  previewNdviCloudLayer = null
   previewFieldMask = null
   previewFieldOutline = null
   previewRgbMarker = null
@@ -2297,34 +2309,37 @@ onUnmounted(() => {
 <style scoped>
 .ndvi-scale {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 34px;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
   z-index: 500;
   display: block;
-  min-height: 28px;
-  padding: 15px 8px 3px;
+  width: 38px;
   border-radius: 999px;
   color: #102113;
-  font-size: 0.6rem;
-  font-weight: 700;
+  font-size: 0.48rem;
+  font-weight: 800;
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 
 .ndvi-scale-title {
   position: absolute;
   left: 50%;
-  bottom: 3px;
-  transform: translateX(-50%);
-  font-size: 0.7rem;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  line-height: 1;
+  padding: 1px 5px;
 }
 
 .ndvi-scale-tick {
   position: absolute;
-  top: 3px;
-  transform: translateX(-50%);
+  left: 50%;
+  transform: translate(-50%, 50%);
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(255,255,255,0.65);
+  text-shadow: 0 1px 2px rgba(255,255,255,0.72);
 }
 
 .ndvi-summary-box {
