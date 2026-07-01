@@ -199,6 +199,15 @@
                   class="preview-map"
                   aria-label="Sentinel-2 preview for the selected location"
                 ></div>
+                <div v-if="previewLayer === 'NDVI' && appStore.selectedField" class="ndvi-summary-box">
+                  <template v-if="ndviSummary">
+                    <span>NDVI avg: {{ ndviSummary.mean.toFixed(2) }}</span>
+                    <span>std: {{ ndviSummary.stddev.toFixed(2) }}</span>
+                  </template>
+                  <template v-else>
+                    <span>{{ ndviSummaryLoading ? 'Loading NDVI stats…' : 'NDVI stats unavailable' }}</span>
+                  </template>
+                </div>
                 <div class="img-zoom-controls">
                   <button @click.stop="zoomImageIn"    title="Zoom in (fetch closer tile)">＋</button>
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
@@ -341,6 +350,7 @@ import {
 } from '../services/climateApi'
 import type { Flags, FlagLabels } from '../types/state'
 import { loadMississippiFields, type FieldFeature } from '../services/fieldBoundaries'
+import { fetchFieldNdviSummary, type NdviFieldSummary } from '../services/fieldStats'
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson'
 
 
@@ -372,6 +382,8 @@ const previewLayer = ref<string>('NDVI')
 const sceneLoading = ref(false)
 const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
+const ndviSummary = ref<NdviFieldSummary | null>(null)
+const ndviSummaryLoading = ref(false)
 const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
 const NDVI_SCALE_COLORS = [
@@ -544,6 +556,31 @@ watch(
     updatePreviewImagery()
   },
   { flush: 'post' },
+)
+
+let ndviSummaryRequestId = 0
+
+async function updateNdviSummary() {
+  const requestId = ++ndviSummaryRequestId
+  ndviSummary.value = null
+  ndviSummaryLoading.value = false
+  if (previewLayer.value !== 'NDVI' || !selectedScene.value || !appStore.selectedField) return
+
+  ndviSummaryLoading.value = true
+  try {
+    const summary = await fetchFieldNdviSummary(selectedScene.value, appStore.selectedField)
+    if (requestId === ndviSummaryRequestId) ndviSummary.value = summary
+  } catch {
+    if (requestId === ndviSummaryRequestId) ndviSummary.value = null
+  } finally {
+    if (requestId === ndviSummaryRequestId) ndviSummaryLoading.value = false
+  }
+}
+
+watch(
+  [selectedScene, previewLayer, () => appStore.selectedField],
+  () => updateNdviSummary(),
+  { deep: true },
 )
 
 // Value for the selected date from fetched climate data
@@ -836,7 +873,7 @@ function selectFieldFeature(field: FieldFeature, fitField = true) {
   layer.remove()
   const center = bounds.getCenter()
   setSelectedPoint(center.lng, center.lat, `Field ${field.properties.fieldId}`, field)
-  if (fitField) map?.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+  if (fitField) centerMainMapOnPoint(center.lng, center.lat, 16)
 }
 
 async function ensurePreviewMap() {
@@ -2121,5 +2158,24 @@ onUnmounted(() => {
   transform: translateX(-50%);
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(255,255,255,0.65);
+}
+
+.ndvi-summary-box {
+  position: absolute;
+  top: 22px;
+  left: 22px;
+  z-index: 510;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(36, 79, 38, 0.28);
+  border-radius: 10px;
+  background: rgba(248, 249, 245, 0.88);
+  color: #244F26;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 4px 14px rgba(36, 79, 38, 0.18);
 }
 </style>

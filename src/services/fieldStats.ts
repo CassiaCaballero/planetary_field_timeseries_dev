@@ -1,7 +1,7 @@
 import type { FeatureCollection } from 'geojson'
 import type { FieldFeature } from './fieldBoundaries'
 import type { BandTimeSeries, RawBands } from '../types/api'
-import { searchSentinel2Items, stacItemDate } from './planetaryComputerApi'
+import { searchSentinel2Items, stacItemDate, type PcStacItem } from './planetaryComputerApi'
 
 const PC_TILER_BASE = import.meta.env.VITE_PC_TILER_BASE || 'https://planetarycomputer.microsoft.com/api/data/v1'
 const OUTPUT_BAND_NAMES = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'SCL'] as const
@@ -45,6 +45,14 @@ function statsForBand(root: any, band: BandName): any {
     ?? root?.[`${band}_b1`]
     ?? root?.[band]?.b1
     ?? root?.[band]?.['1']
+}
+
+function firstStats(root: any, ...names: string[]): any {
+  for (const name of names) {
+    const stats = root?.[name] ?? root?.[`${name}_b1`] ?? root?.[name]?.b1 ?? root?.[name]?.['1']
+    if (stats) return stats
+  }
+  return root?.b1 ?? root?.['1'] ?? root
 }
 
 function parseStats(json: any): RawBands {
@@ -110,6 +118,55 @@ async function fetchItemFieldBands(item: any, field: FieldFeature, collection: s
 
   return await postStatistics(url, collectionBody)
     ?? await postStatistics(url, safeField)
+}
+
+export interface NdviFieldSummary {
+  mean: number
+  stddev: number
+}
+
+function parseNdviSummary(json: any): NdviFieldSummary | null {
+  const root = statisticsRoot(json)
+  const stats = firstStats(root, 'expression', 'expr', 'NDVI', 'ndvi')
+  const mean = firstNumber(stats?.mean, stats?.avg)
+  const stddev = firstNumber(stats?.std, stats?.stddev, stats?.stdev, stats?.standard_deviation)
+  return mean == null || stddev == null ? null : { mean, stddev }
+}
+
+async function postNdviSummary(url: string, body: unknown): Promise<NdviFieldSummary | null> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) return null
+    return parseNdviSummary(await res.json())
+  } catch {
+    return null
+  }
+}
+
+export async function fetchFieldNdviSummary(item: PcStacItem, field: FieldFeature): Promise<NdviFieldSummary | null> {
+  const params = new URLSearchParams()
+  params.set('collection', item.collection)
+  params.set('item', item.id)
+  params.append('assets', 'B08')
+  params.append('assets', 'B04')
+  params.set('asset_as_band', 'true')
+  params.set('expression', '((B08*1.0)-B04)/((B08*1.0)+B04)')
+  params.set('max_size', '256')
+
+  const url = `${PC_TILER_BASE}/item/statistics?${params.toString()}`
+  const safeField: FieldFeature = {
+    type: 'Feature',
+    geometry: field.geometry,
+    properties: { fieldId: field.properties.fieldId },
+  }
+  const collectionBody: FeatureCollection = { type: 'FeatureCollection', features: [safeField] }
+
+  return await postNdviSummary(url, collectionBody)
+    ?? await postNdviSummary(url, safeField)
 }
 
 function centroid(field: FieldFeature): [number, number] {
