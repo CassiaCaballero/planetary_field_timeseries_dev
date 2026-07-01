@@ -1,13 +1,14 @@
 <template>
   <div class="tp-shell">
     <header class="topbar">
-      <div class="brand" aria-label="Satellite Time Series Browser">
+      <div class="brand" aria-label="Mississippi Crop Watch">
         <svg viewBox="0 0 32 32" aria-hidden="true">
-          <circle cx="16" cy="16" r="6.5" fill="var(--accent)" />
-          <ellipse cx="16" cy="16" rx="13.5" ry="6" stroke="var(--accent)" stroke-width="1.6" opacity=".82" transform="rotate(-28 16 16)" />
-          <circle cx="27" cy="9.5" r="1.8" fill="var(--accent-2)" />
+          <path d="M16 27V10" stroke="var(--accent-2)" stroke-width="2.2" stroke-linecap="round" />
+          <path d="M15.8 14.5C9.2 14.2 5.2 10.1 5 5.3c5.7-.4 10.3 2.6 11.7 8.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M17 18.5c6.4.2 10.1-3.6 10.4-8.2-5.6-.5-9.9 2.2-11.3 7.4" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M9 27h14" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" />
         </svg>
-        <div class="brand-title">Satellite Time Series Browser</div>
+        <div class="brand-title">Mississippi Crop Watch</div>
       </div>
 
       <form class="search" @submit.prevent="runSearch">
@@ -62,9 +63,6 @@
         </div>
       </div>
 
-      <div class="top-actions">
-        <button class="icon-btn" title="Share link" @click="copyShareLink">link</button>
-      </div>
     </header>
 
     <nav class="tool-rail" aria-label="Map tools">
@@ -107,9 +105,9 @@
       </div>
     </aside>
 
-    <main class="map-stage">
+    <main class="map-stage" :class="{ 'inspector-open': inspectorOpen }">
       <div ref="mapEl" class="map"></div>
-      <div v-if="!inspectorOpen" class="map-hint">Click anywhere on the map to analyze a Sentinel-2 time series</div>
+      <div v-if="!inspectorOpen" class="map-hint">Click in any field to analyze NDVI timeseries from Sentinel-2 satellite</div>
 
       <div class="basemap-switcher">
         <button
@@ -121,27 +119,15 @@
           {{ b.label }}
         </button>
       </div>
-
-      <aside ref="inspectorEl" class="inspector" :class="{ open: inspectorOpen }" aria-label="Location inspector">
-        <div class="inspector-head">
-          <div>
-            <div class="place">{{ placeName }}</div>
-            <div class="coord mono">{{ formattedCoordinate }}</div>
-            <div class="meta">{{ sceneCountLabel }}</div>
-          </div>
-          <div class="head-actions">
-            <button class="icon-btn" title="Copy link" @click="copyShareLink">link</button>
-            <button class="icon-btn" title="Close inspector" @click="closeInspector">x</button>
-          </div>
-        </div>
-
-        <div class="inspector-body">
+      <div class="imagery-dock">
+        <div class="imagery-dock-scroll">
           <section class="panel-card">
             <h3>
               Imagery
               <span class="segmented">
                 <button :class="{ active: previewLayer === 'TRUE-COLOR' }" @click="previewLayer = 'TRUE-COLOR'">True</button>
                 <button :class="{ active: previewLayer === 'FALSE-COLOR' }" @click="previewLayer = 'FALSE-COLOR'">False</button>
+                <button :class="{ active: previewLayer === 'NDVI' }" @click="previewLayer = 'NDVI'">NDVI</button>
                 <template v-for="layer in activeClimateLayers" :key="layer.id">
                   <button
                     :class="{ active: previewLayer === layer.imageryMode }"
@@ -196,15 +182,55 @@
             <template v-else>
               <div v-if="sceneLoading" class="image-skeleton"></div>
               <div v-else-if="selectedScene" class="preview-tile">
-                <div
-                  ref="previewMapEl"
-                  class="preview-map"
-                  aria-label="Sentinel-2 preview for the selected location"
-                ></div>
+                <div class="preview-split">
+                  <div class="preview-pane">
+                    <span class="preview-pane-label">RGB</span>
+                    <div
+                      ref="previewRgbMapEl"
+                      class="preview-map"
+                      aria-label="Sentinel-2 true color preview for the selected location"
+                    ></div>
+                  </div>
+                  <div class="preview-pane">
+                    <span class="preview-pane-label">NDVI</span>
+                    <div
+                      ref="previewNdviMapEl"
+                      class="preview-map"
+                      aria-label="Sentinel-2 NDVI preview for the selected location"
+                    ></div>
+                  </div>
+                </div>
+                <div v-if="appStore.selectedField" class="ndvi-summary-box">
+                  <span>Image date: {{ selectedSceneDate || '—' }}</span>
+                  <template v-if="ndviSummary">
+                    <span>NDVI avg: {{ ndviSummary.mean.toFixed(2) }}</span>
+                    <span>std: {{ ndviSummary.stddev.toFixed(2) }}</span>
+                  </template>
+                  <template v-else>
+                    <span>{{ ndviSummaryLoading ? 'Loading NDVI stats…' : 'NDVI stats unavailable' }}</span>
+                  </template>
+                  <span
+                    v-for="item in climateMeanSummaries"
+                    :key="item.id"
+                  >
+                    {{ item.label }} avg: {{ item.value }}
+                  </span>
+                </div>
                 <div class="img-zoom-controls">
                   <button @click.stop="zoomImageIn"    title="Zoom in (fetch closer tile)">＋</button>
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
+                </div>
+                <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
+                  <span
+                    v-for="tick in NDVI_SCALE_TICKS"
+                    :key="tick.label"
+                    class="ndvi-scale-tick"
+                    :style="{ bottom: tick.left }"
+                  >
+                    {{ tick.label }}
+                  </span>
+                  <span class="ndvi-scale-title">NDVI</span>
                 </div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
@@ -229,7 +255,22 @@
             </div>
             <p v-else class="empty">No cloud-free scenes found in this date range.</p>
           </section>
+        </div>
+      </div>
 
+      <aside ref="inspectorEl" class="inspector" :class="{ open: inspectorOpen }" aria-label="Location inspector">
+        <div class="inspector-head">
+          <div>
+            <div class="place">{{ placeName }}</div>
+            <div class="coord mono">{{ formattedCoordinate }}</div>
+            <div class="meta">{{ sceneCountLabel }}</div>
+          </div>
+          <div class="head-actions">
+            <button class="icon-btn" title="Close inspector" @click="closeInspector">x</button>
+          </div>
+        </div>
+
+        <div class="inspector-body">
           <section class="panel-card">
             <h3>
               NDVI time series
@@ -246,8 +287,8 @@
               :flags="emptyFlags"
               :flag-labels="emptyFlagLabels"
               :selected-date="appStore.selectedDate"
-              :y-min="0"
-              :y-max="1"
+              :y-min="null"
+              :y-max="null"
               unit="NDVI"
               class="mini-chart"
               @point-click="onChartPointClick"
@@ -277,8 +318,8 @@
                 :flags="emptyFlags"
                 :flag-labels="emptyFlagLabels"
                 :selected-date="appStore.selectedDate"
-                :y-min="layer.yMin"
-                :y-max="layer.yMax"
+                :y-min="null"
+                :y-max="null"
                 :unit="layer.unit"
                 :color="currentPaletteColor(layer)"
                 :chart-type="layer.chartType"
@@ -312,6 +353,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useAppStore } from '../stores/app'
 import { getDataSource } from '../config/datasources'
+import { NDVI_SCALE_TICKS, NDVI_VERTICAL_SCALE_BACKGROUND } from '../config/ndviPalette'
 import { useTimeSeries } from '../composables/useTimeSeries'
 import TimeSeriesChart from '../plugins/timeSeries/TimeSeriesChart.vue'
 import { BASEMAPS, getBasemap, type BasemapId } from '../utils/basemap'
@@ -330,12 +372,16 @@ import {
   type ClimatePoint,
 } from '../services/climateApi'
 import type { Flags, FlagLabels } from '../types/state'
+import { loadMississippiFields, type FieldFeature } from '../services/fieldBoundaries'
+import { fetchFieldNdviSummary, type NdviFieldSummary } from '../services/fieldStats'
+import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson'
 
 
 const appStore = useAppStore()
 const mapEl = ref<HTMLDivElement | null>(null)
 const inspectorEl = ref<HTMLElement | null>(null)
-const previewMapEl = ref<HTMLDivElement | null>(null)
+const previewRgbMapEl = ref<HTMLDivElement | null>(null)
+const previewNdviMapEl = ref<HTMLDivElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 const datePopoverRef = ref<HTMLElement | null>(null)
 
@@ -354,13 +400,15 @@ const startDate = ref(appStore.startDate)
 const endDate = ref(appStore.endDate)
 const pendingStart = ref(startDate.value)
 const pendingEnd = ref(endDate.value)
-const activePreset = ref('5y')
+const activePreset = ref('1y')
 
-const previewLayer = ref<string>('TRUE-COLOR')
+const previewLayer = ref<string>('NDVI')
 const sceneLoading = ref(false)
 const scenes = ref<PcStacItem[]>([])
 const selectedScene = ref<PcStacItem | null>(null)
-const PREVIEW_DEFAULT_ZOOM = 16
+const ndviSummary = ref<NdviFieldSummary | null>(null)
+const ndviSummaryLoading = ref(false)
+const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
@@ -373,7 +421,7 @@ const sceneDates = computed(() =>
 
 // Layers panel
 const layersPanelOpen = ref(false)
-const activeClimateIds = ref(new Set<string>())
+const activeClimateIds = ref(new Set(CLIMATE_LAYERS.map(layer => layer.id)))
 const activeClimateLayers = computed(() => CLIMATE_LAYERS.filter(l => activeClimateIds.value.has(l.id)))
 
 const climateData = reactive<Record<string, ClimatePoint[]>>({})
@@ -411,7 +459,7 @@ function toggleClimateLayer(id: string) {
     // Reset imagery if this layer's mode was active
     const removed = CLIMATE_LAYERS.find(l => l.id === id)
     if (removed && previewLayer.value === removed.imageryMode) {
-      previewLayer.value = 'TRUE-COLOR'
+      previewLayer.value = 'NDVI'
     }
   } else {
     next.add(id)
@@ -442,12 +490,21 @@ watch(() => appStore.coordinate, () => {
   centerPreviewMap(PREVIEW_DEFAULT_ZOOM)
 })
 
+watch(() => appStore.selectedField, () => {
+  fieldsLayer?.setStyle(feature => ({
+    color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+    weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+    fillOpacity: 0.08,
+  }))
+  updatePreviewFieldMask()
+}, { deep: true })
+
 function zoomImageIn() {
-  previewMap?.zoomIn()
+  zoomPreviewMaps(1)
 }
 
 function zoomImageOut() {
-  previewMap?.zoomOut()
+  zoomPreviewMaps(-1)
 }
 
 function zoomImageReset() {
@@ -490,6 +547,31 @@ watch(
   { flush: 'post' },
 )
 
+let ndviSummaryRequestId = 0
+
+async function updateNdviSummary() {
+  const requestId = ++ndviSummaryRequestId
+  ndviSummary.value = null
+  ndviSummaryLoading.value = false
+  if (!selectedScene.value || !appStore.selectedField) return
+
+  ndviSummaryLoading.value = true
+  try {
+    const summary = await fetchFieldNdviSummary(selectedScene.value, appStore.selectedField)
+    if (requestId === ndviSummaryRequestId) ndviSummary.value = summary
+  } catch {
+    if (requestId === ndviSummaryRequestId) ndviSummary.value = null
+  } finally {
+    if (requestId === ndviSummaryRequestId) ndviSummaryLoading.value = false
+  }
+}
+
+watch(
+  [selectedScene, previewLayer, () => appStore.selectedField],
+  () => updateNdviSummary(),
+  { deep: true },
+)
+
 // Value for the selected date from fetched climate data
 function climateValueAtDate(layerId: string): number | null {
   const date = appStore.selectedDate
@@ -506,6 +588,25 @@ function climateStats(layerId: string): { min: string; avg: string; max: string 
   const avg = values.reduce((a, b) => a + b, 0) / values.length
   return { min: min.toFixed(1), avg: avg.toFixed(1), max: max.toFixed(1) }
 }
+
+const CLIMATE_SUMMARY_LABELS: Record<string, string> = {
+  temperature: 'Temp',
+  precipitation: 'Precip',
+  et0: 'ET₀',
+}
+
+const climateMeanSummaries = computed(() =>
+  CLIMATE_LAYERS.map(layer => {
+    const stats = climateStats(layer.id)
+    return stats
+      ? {
+          id: layer.id,
+          label: CLIMATE_SUMMARY_LABELS[layer.id] ?? layer.label,
+          value: `${stats.avg} ${layer.unit}`,
+        }
+      : null
+  }).filter((item): item is { id: string; label: string; value: string } => item !== null),
+)
 
 // Needle position (0–100%) on the gradient bar
 function climateNeedlePos(layer: ClimateLayer): number {
@@ -529,10 +630,21 @@ let map: L.Map | null = null
 let baseLayer: L.TileLayer | null = null
 let labelLayer: L.TileLayer | null = null
 let marker: L.Marker | null = null
-let previewMap: L.Map | null = null
-let previewTileLayer: L.TileLayer | null = null
-let previewMarker: L.Marker | null = null
+let fieldsLayer: L.GeoJSON | null = null
+let allFields: FeatureCollection<Polygon | MultiPolygon> | null = null
+let fieldsLoading = false
+let previewRgbMap: L.Map | null = null
+let previewNdviMap: L.Map | null = null
+let previewRgbTileLayer: L.TileLayer | null = null
+let previewNdviTileLayer: L.TileLayer | null = null
+let previewRgbCloudLayer: L.TileLayer | null = null
+let previewNdviCloudLayer: L.TileLayer | null = null
+let previewFieldMask: L.Polygon | null = null
+let previewFieldOutline: L.GeoJSON | null = null
+let previewRgbMarker: L.Marker | null = null
+let previewNdviMarker: L.Marker | null = null
 let previewResizeObserver: ResizeObserver | null = null
+let syncingPreviewMaps = false
 let sceneRequestId = 0
 let previewTileRequestId = 0
 
@@ -542,6 +654,10 @@ const presets = [
   { id: '5y', label: 'Last 5 years', short: '5y' },
   { id: 'all', label: 'Full archive', short: '2015-' },
 ]
+
+const MISSISSIPPI_INITIAL_CENTER: L.LatLngExpression = [32.75, -89.7]
+const MISSISSIPPI_INITIAL_ZOOM = 7
+const FIELD_LOAD_ZOOM = 12
 
 const formattedCoordinate = computed(() => {
   const [lon, lat] = appStore.coordinate
@@ -622,6 +738,100 @@ function markerIcon() {
   })
 }
 
+function fieldCoordinates(feature: FieldFeature): number[][] {
+  return feature.geometry.type === 'Polygon'
+    ? feature.geometry.coordinates.flat()
+    : feature.geometry.coordinates.flat(2)
+}
+
+function fieldIntersectsMapBounds(feature: FieldFeature, bounds: L.LatLngBounds) {
+  return fieldCoordinates(feature).some(([lng, lat]) => bounds.contains([lat, lng]))
+}
+
+function pointInRing(lon: number, lat: number, ring: number[][]) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const crosses = ((yi > lat) !== (yj > lat)) && (lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)
+    if (crosses) inside = !inside
+  }
+  return inside
+}
+
+function fieldContainsPoint(feature: FieldFeature, lon: number, lat: number) {
+  const polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates
+  return polygons.some(polygon => {
+    const [outer, ...holes] = polygon
+    return Boolean(outer?.length && pointInRing(lon, lat, outer) && !holes.some(hole => pointInRing(lon, lat, hole)))
+  })
+}
+
+function fieldAtPoint(lon: number, lat: number): FieldFeature | null {
+  if (!allFields) return null
+  return (allFields.features as FieldFeature[]).find(feature => fieldContainsPoint(feature, lon, lat)) ?? null
+}
+
+function visibleFields() {
+  if (!map || !allFields) return null
+  const bounds = map.getBounds().pad(0.15)
+  return {
+    type: 'FeatureCollection' as const,
+    features: allFields.features.filter(feature => fieldIntersectsMapBounds(feature as FieldFeature, bounds)),
+  }
+}
+
+function renderVisibleFields() {
+  if (!map || !allFields) return
+  const visible = visibleFields()
+  fieldsLayer?.remove()
+  if (!visible?.features.length) {
+    fieldsLayer = null
+    return
+  }
+  fieldsLayer = L.geoJSON(visible, {
+    style: feature => ({
+      color: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? '#FFC145' : '#FFC145',
+      weight: (feature as FieldFeature | undefined)?.properties?.fieldId === appStore.selectedField?.properties.fieldId ? 3 : 1,
+      fillOpacity: 0.08,
+    }),
+    onEachFeature: (feature, layer) => {
+      layer.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e)
+        selectFieldFeature(feature as FieldFeature)
+      })
+    },
+  }).addTo(map)
+}
+
+async function updateFieldsLayerForZoom() {
+  if (!map) return
+  if (map.getZoom() < FIELD_LOAD_ZOOM) {
+    fieldsLayer?.remove()
+    fieldsLayer = null
+    return
+  }
+  if (allFields) {
+    renderVisibleFields()
+    return
+  }
+  if (fieldsLoading) return
+  fieldsLoading = true
+  try {
+    allFields = await loadMississippiFields()
+    renderVisibleFields()
+  } catch (e) {
+    showToast(`Field boundaries failed - ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    fieldsLoading = false
+  }
+}
+
+async function loadFieldsLayer() {
+  if (!map) return
+  await updateFieldsLayerForZoom()
+}
+
 function previewMarkerIcon() {
   return L.divIcon({
     className: 'tp-preview-marker',
@@ -635,17 +845,8 @@ function isDesktopInspector() {
   return window.matchMedia('(min-width: 861px)').matches
 }
 
-function visibleBasemapCenterFor(lon: number, lat: number, zoom: number): L.LatLngExpression {
-  if (!map || !inspectorOpen.value || !isDesktopInspector()) return [lat, lon]
-
-  const size = map.getSize()
-  const inspectorWidth = inspectorEl.value?.getBoundingClientRect().width ?? size.x / 2
-  const visibleWidth = Math.max(1, size.x - inspectorWidth)
-  const desiredPoint = L.point(visibleWidth / 2, size.y / 2)
-  const containerCenter = L.point(size.x / 2, size.y / 2)
-  const selectedPoint = map.project([lat, lon], zoom)
-  const targetCenterPoint = selectedPoint.add(containerCenter.subtract(desiredPoint))
-  return map.unproject(targetCenterPoint, zoom)
+function visibleBasemapCenterFor(lon: number, lat: number, _zoom: number): L.LatLngExpression {
+  return [lat, lon]
 }
 
 function centerMainMapOnPoint(lon: number, lat: number, zoom = map?.getZoom() ?? 12, animate = true) {
@@ -655,7 +856,8 @@ function centerMainMapOnPoint(lon: number, lat: number, zoom = map?.getZoom() ??
   else map.setView(center, zoom)
 }
 
-function setSelectedPoint(lon: number, lat: number, name = 'Selected location') {
+function setSelectedPoint(lon: number, lat: number, name = 'Selected location', field: FieldFeature | null = null) {
+  appStore.setSelectedField(field)
   appStore.setCoordinate(lon, lat)
   placeName.value = name
   inspectorOpen.value = true
@@ -670,50 +872,136 @@ function setSelectedPoint(lon: number, lat: number, name = 'Selected location') 
   for (const id of activeClimateIds.value) fetchClimate(id)
 }
 
+async function selectFieldFeature(field: FieldFeature, fitField = true) {
+  const layer = L.geoJSON(field)
+  const bounds = layer.getBounds()
+  layer.remove()
+  const center = bounds.getCenter()
+  setSelectedPoint(center.lng, center.lat, `Field ${field.properties.fieldId}`, field)
+  if (!fitField) return
+  await nextTick()
+  map?.invalidateSize()
+  centerMainMapOnPoint(center.lng, center.lat, 16, false)
+}
+
+function eachPreviewMap(callback: (map: L.Map) => void) {
+  if (previewRgbMap) callback(previewRgbMap)
+  if (previewNdviMap) callback(previewNdviMap)
+}
+
+function invalidatePreviewMaps() {
+  eachPreviewMap(map => map.invalidateSize())
+}
+
+function syncPreviewView(source: L.Map) {
+  if (syncingPreviewMaps) return
+  const target = source === previewRgbMap ? previewNdviMap : previewRgbMap
+  if (!target) return
+  syncingPreviewMaps = true
+  target.setView(source.getCenter(), source.getZoom(), { animate: false })
+  previewTileZoom.value = source.getZoom()
+  syncingPreviewMaps = false
+}
+
+function zoomPreviewMaps(delta: number) {
+  const nextZoom = Math.max(10, Math.min(18, previewTileZoom.value + delta))
+  centerPreviewMap(nextZoom)
+}
+
 async function ensurePreviewMap() {
   await nextTick()
-  if (!previewMapEl.value || previewMap) return
+  if (!previewRgbMapEl.value || !previewNdviMapEl.value || (previewRgbMap && previewNdviMap)) return
 
   const [lon, lat] = appStore.coordinate
-  previewMap = L.map(previewMapEl.value, {
-    attributionControl: false,
-    zoomControl: false,
-    minZoom: 10,
-    maxZoom: 18,
-    zoomSnap: 1,
-    zoomDelta: 1,
-    scrollWheelZoom: true,
-    worldCopyJump: true,
-  }).setView([lat, lon], previewTileZoom.value)
+  const createPreviewMap = (el: HTMLDivElement) => {
+    const preview = L.map(el, {
+      attributionControl: false,
+      zoomControl: false,
+      minZoom: 10,
+      maxZoom: 18,
+      zoomSnap: 1,
+      zoomDelta: 1,
+      scrollWheelZoom: true,
+      worldCopyJump: true,
+    }).setView([lat, lon], previewTileZoom.value)
 
-  L.DomEvent.disableClickPropagation(previewMapEl.value)
-  L.DomEvent.disableScrollPropagation(previewMapEl.value)
+    L.DomEvent.disableClickPropagation(el)
+    L.DomEvent.disableScrollPropagation(el)
+    preview.on('moveend zoomend', () => syncPreviewView(preview))
+    return preview
+  }
 
-  previewMarker = L.marker([lat, lon], {
+  previewRgbMap = createPreviewMap(previewRgbMapEl.value)
+  previewNdviMap = createPreviewMap(previewNdviMapEl.value)
+
+  previewRgbMarker = L.marker([lat, lon], {
     icon: previewMarkerIcon(),
     interactive: false,
     keyboard: false,
-  }).addTo(previewMap)
+  }).addTo(previewRgbMap)
+  previewNdviMarker = L.marker([lat, lon], {
+    icon: previewMarkerIcon(),
+    interactive: false,
+    keyboard: false,
+  }).addTo(previewNdviMap)
 
-  previewMap.on('zoomend', () => {
-    if (previewMap) previewTileZoom.value = previewMap.getZoom()
-  })
-
-  previewResizeObserver = new ResizeObserver(() => previewMap?.invalidateSize())
-  previewResizeObserver.observe(previewMapEl.value)
+  previewResizeObserver = new ResizeObserver(invalidatePreviewMaps)
+  previewResizeObserver.observe(previewRgbMapEl.value)
+  previewResizeObserver.observe(previewNdviMapEl.value)
 }
 
 function updatePreviewMarker() {
   const [lon, lat] = appStore.coordinate
-  previewMarker?.setLatLng([lat, lon])
+  previewRgbMarker?.setLatLng([lat, lon])
+  previewNdviMarker?.setLatLng([lat, lon])
+}
+
+function selectedFieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
+  const polygons = field.geometry.type === 'Polygon' ? [field.geometry.coordinates] : field.geometry.coordinates
+  return polygons
+    .map(polygon => polygon[0]?.map(([lng, lat]) => [lat, lng] as L.LatLngExpression) ?? [])
+    .filter(ring => ring.length > 0)
+}
+
+function updatePreviewFieldMask() {
+  previewFieldMask?.remove()
+  previewFieldOutline?.remove()
+  previewFieldMask = null
+  previewFieldOutline = null
+
+  if (!previewNdviMap || !appStore.selectedField) return
+
+  const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
+  const cropRings = selectedFieldExteriorRings(appStore.selectedField)
+  if (!cropRings.length) return
+
+  previewFieldMask = L.polygon([worldRing, ...cropRings], {
+    stroke: false,
+    fillColor: '#132033',
+    fillOpacity: 0.82,
+    fillRule: 'evenodd',
+    interactive: false,
+  }).addTo(previewNdviMap)
+
+  previewFieldOutline = L.geoJSON(appStore.selectedField, {
+    interactive: false,
+    style: {
+      color: '#FFC145',
+      weight: 2,
+      fillOpacity: 0,
+    },
+  }).addTo(previewNdviMap)
 }
 
 function centerPreviewMap(zoom = previewTileZoom.value) {
-  if (!previewMap) return
   const [lon, lat] = appStore.coordinate
-  previewMap.setView([lat, lon], zoom)
+  eachPreviewMap(map => map.setView([lat, lon], zoom, { animate: false }))
   previewTileZoom.value = zoom
   updatePreviewMarker()
+}
+
+function satelliteRgbLayerMode() {
+  return previewLayer.value === 'FALSE-COLOR' ? 'FALSE-COLOR' : 'TRUE-COLOR'
 }
 
 async function updatePreviewImagery() {
@@ -721,26 +1009,41 @@ async function updatePreviewImagery() {
 
   const requestId = ++previewTileRequestId
   await ensurePreviewMap()
-  if (!previewMap || !selectedScene.value) return
+  if (!previewRgbMap || !previewNdviMap || !selectedScene.value) return
 
   try {
-    const tileUrl = await getTileUrl(selectedScene.value, previewLayer.value)
-    if (requestId !== previewTileRequestId || !previewMap) return
+    const [rgbTileUrl, ndviTileUrl, cloudMaskTileUrl] = await Promise.all([
+      getTileUrl(selectedScene.value, satelliteRgbLayerMode()),
+      getTileUrl(selectedScene.value, 'NDVI'),
+      getTileUrl(selectedScene.value, 'SCL_CLOUD_MASK'),
+    ])
+    if (requestId !== previewTileRequestId || !previewRgbMap || !previewNdviMap) return
 
-    if (previewTileLayer) {
-      previewTileLayer.setUrl(tileUrl)
-    } else {
-      previewTileLayer = L.tileLayer(tileUrl, {
-        minZoom: 10,
-        maxZoom: 18,
-        maxNativeZoom: 18,
-        keepBuffer: 3,
-        updateWhenIdle: false,
-      }).addTo(previewMap)
+    const tileOptions = {
+      minZoom: 10,
+      maxZoom: 18,
+      maxNativeZoom: 18,
+      keepBuffer: 3,
+      updateWhenIdle: false,
     }
 
+    if (previewRgbTileLayer) previewRgbTileLayer.setUrl(rgbTileUrl)
+    else previewRgbTileLayer = L.tileLayer(rgbTileUrl, tileOptions).addTo(previewRgbMap)
+
+    if (previewNdviTileLayer) previewNdviTileLayer.setUrl(ndviTileUrl)
+    else previewNdviTileLayer = L.tileLayer(ndviTileUrl, tileOptions).addTo(previewNdviMap)
+
+    const cloudOptions = { ...tileOptions, opacity: 0.72 }
+    if (previewRgbCloudLayer) previewRgbCloudLayer.setUrl(cloudMaskTileUrl)
+    else previewRgbCloudLayer = L.tileLayer(cloudMaskTileUrl, cloudOptions).addTo(previewRgbMap)
+
+    if (previewNdviCloudLayer) previewNdviCloudLayer.setUrl(cloudMaskTileUrl)
+    else previewNdviCloudLayer = L.tileLayer(cloudMaskTileUrl, cloudOptions).addTo(previewNdviMap)
+
     updatePreviewMarker()
-    previewMarker?.bringToFront()
+    updatePreviewFieldMask()
+    previewRgbMarker?.bringToFront()
+    previewNdviMarker?.bringToFront()
     centerPreviewMap(previewTileZoom.value)
   } catch (e) {
     if (requestId === previewTileRequestId) {
@@ -753,10 +1056,18 @@ function destroyPreviewMap() {
   previewTileRequestId++
   previewResizeObserver?.disconnect()
   previewResizeObserver = null
-  previewMap?.remove()
-  previewMap = null
-  previewTileLayer = null
-  previewMarker = null
+  previewRgbMap?.remove()
+  previewNdviMap?.remove()
+  previewRgbMap = null
+  previewNdviMap = null
+  previewRgbTileLayer = null
+  previewNdviTileLayer = null
+  previewRgbCloudLayer = null
+  previewNdviCloudLayer = null
+  previewFieldMask = null
+  previewFieldOutline = null
+  previewRgbMarker = null
+  previewNdviMarker = null
 }
 
 function closeInspector() {
@@ -859,16 +1170,6 @@ function focusSearch() {
   searchInput.value?.focus()
 }
 
-async function copyShareLink() {
-  updateUrl()
-  try {
-    await navigator.clipboard.writeText(window.location.href)
-    showToast('Share link copied.')
-  } catch {
-    showToast('Could not copy link.')
-  }
-}
-
 function showToast(message: string) {
   toast.value = message
   window.setTimeout(() => {
@@ -892,12 +1193,20 @@ function onKeydown(e: KeyboardEvent) {
 
 function onWindowResize() {
   map?.invalidateSize()
-  previewMap?.invalidateSize()
+  invalidatePreviewMaps()
   recenterSelectedPointInBasemap(false)
 }
 
+watch(inspectorOpen, () => {
+  nextTick(() => {
+    map?.invalidateSize()
+    invalidatePreviewMaps()
+    recenterSelectedPointInBasemap(false)
+  })
+})
+
 onMounted(() => {
-  if (appStore.theme !== 'dark') appStore.theme = 'dark'
+  if (appStore.theme !== 'light') appStore.theme = 'light'
   if (!mapEl.value) return
   const [lon, lat] = appStore.coordinate
   const def = getBasemap(activeBasemap.value)
@@ -905,7 +1214,7 @@ onMounted(() => {
     zoomControl: false,
     attributionControl: true,
     worldCopyJump: true,
-  }).setView([lat, lon], inspectorOpen.value ? 13 : 3)
+  }).setView(inspectorOpen.value ? [lat, lon] : MISSISSIPPI_INITIAL_CENTER, inspectorOpen.value ? 13 : MISSISSIPPI_INITIAL_ZOOM)
   L.control.zoom({ position: 'topright' }).addTo(map)
   baseLayer = L.tileLayer(def.url, def.options).addTo(map)
   if (def.labelUrl) {
@@ -914,18 +1223,29 @@ onMounted(() => {
 
   map.on('click', (e: L.LeafletMouseEvent) => {
     const { lng, lat } = e.latlng.wrap()
-    setSelectedPoint(lng, lat)
+    const field = fieldAtPoint(lng, lat)
+    if (field) {
+      selectFieldFeature(field)
+      return
+    }
+    setSelectedPoint(lng, lat, 'Selected location', null)
   })
   map.on('mousemove', (e: L.LeafletMouseEvent) => {
     statusCoordinate.value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`
   })
-  map.on('zoomend', () => { mapZoom.value = map?.getZoom() ?? mapZoom.value })
+  map.on('zoomend moveend', () => {
+    mapZoom.value = map?.getZoom() ?? mapZoom.value
+    updateFieldsLayerForZoom()
+  })
   mapZoom.value = map.getZoom()
+
+  loadFieldsLayer()
 
   if (inspectorOpen.value) {
     marker = L.marker([lat, lon], { icon: markerIcon() }).addTo(map)
     centerMainMapOnPoint(lon, lat, 13, false)
     loadSceneSummary()
+    for (const id of activeClimateIds.value) fetchClimate(id)
   }
 
   document.addEventListener('click', onDocumentClick, true)
@@ -969,6 +1289,7 @@ onUnmounted(() => {
   gap: 16px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   z-index: 1200;
 }
@@ -1001,6 +1322,7 @@ onUnmounted(() => {
   height: 34px;
   padding: 0 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
@@ -1119,7 +1441,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 8px;
@@ -1148,13 +1470,6 @@ onUnmounted(() => {
   border-color: rgba(54, 226, 164, 0.35);
   color: var(--accent);
 }
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
 
 .icon-btn {
   display: grid;
@@ -1219,11 +1534,54 @@ onUnmounted(() => {
   grid-area: main;
   position: relative;
   overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .map {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+}
+
+.map-stage.inspector-open {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 50vw);
+  grid-template-rows: minmax(220px, 1fr) 50vh;
+  grid-template-areas:
+    "map inspector"
+    "imagery inspector";
+}
+
+.map-stage.inspector-open .map {
+  grid-area: map;
+}
+
+.imagery-dock {
+  display: none;
+}
+
+.map-stage.inspector-open .imagery-dock {
+  grid-area: imagery;
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-base);
+  border-top: 1px solid var(--border);
+}
+
+.imagery-dock-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.imagery-dock .panel-card {
+  margin-bottom: 0;
 }
 
 :deep(.tp-marker span) {
@@ -1244,10 +1602,10 @@ onUnmounted(() => {
   transform: translateX(-50%);
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(18, 24, 38, 0.88);
-  color: var(--text-secondary);
+  background: rgba(26, 38, 56, 0.72);
+  backdrop-filter: blur(12px);
+  color: var(--accent);
   padding: 8px 16px;
-  backdrop-filter: blur(8px);
 }
 
 .basemap-switcher {
@@ -1262,6 +1620,10 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-2);
+}
+
+.map-stage.inspector-open .basemap-switcher {
+  bottom: calc(50vh + 42px);
 }
 
 .basemap-switcher button {
@@ -1289,6 +1651,7 @@ onUnmounted(() => {
   width: 50vw;
   height: 100%;
   background: var(--bg-panel);
+  backdrop-filter: blur(16px);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-pop);
   transform: translateX(100%);
@@ -1297,6 +1660,15 @@ onUnmounted(() => {
 
 .inspector.open {
   transform: translateX(0);
+}
+
+.map-stage.inspector-open .inspector.open {
+  position: relative;
+  grid-area: inspector;
+  top: auto;
+  right: auto;
+  width: 100%;
+  transform: none;
 }
 
 .inspector-head {
@@ -1339,6 +1711,7 @@ onUnmounted(() => {
   margin-bottom: 14px;
   padding: 12px;
   background: var(--bg-panel-2);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -1416,6 +1789,38 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-base);
+}
+
+.preview-split {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+}
+
+.preview-pane {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: var(--bg-base);
+}
+
+.preview-pane-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 510;
+  border-radius: 999px;
+  background: rgba(248, 249, 245, 0.86);
+  color: #244F26;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 7px;
+  text-transform: uppercase;
 }
 
 .preview-map {
@@ -1564,7 +1969,7 @@ onUnmounted(() => {
 .chart-skeleton,
 .release-skeleton,
 .image-skeleton {
-  background: linear-gradient(90deg, var(--bg-panel-2) 25%, #202a3a 37%, var(--bg-panel-2) 63%);
+  background: linear-gradient(90deg, var(--bg-panel-2) 25%, rgba(36, 79, 38, 0.10) 37%, var(--bg-panel-2) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.35s ease infinite;
   border-radius: var(--radius-sm);
@@ -1595,7 +2000,6 @@ onUnmounted(() => {
   color: var(--error);
 }
 
-
 .statusbar {
   grid-area: status;
   display: flex;
@@ -1603,6 +2007,7 @@ onUnmounted(() => {
   gap: 18px;
   padding: 0 16px;
   background: var(--bg-panel);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -1866,6 +2271,23 @@ onUnmounted(() => {
     width: min(430px, calc(100vw - 24px));
   }
 
+  .map-stage.inspector-open {
+    display: block;
+  }
+
+  .map-stage.inspector-open .map {
+    position: absolute;
+    inset: 0;
+  }
+
+  .map-stage.inspector-open .imagery-dock {
+    display: none;
+  }
+
+  .map-stage.inspector-open .basemap-switcher {
+    bottom: 34px;
+  }
+
   .inspector {
     top: auto;
     bottom: 0;
@@ -1877,7 +2299,65 @@ onUnmounted(() => {
   }
 
   .inspector.open {
+    position: absolute;
     transform: translateY(0);
   }
+}
+</style>
+
+
+<style scoped>
+.ndvi-scale {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 500;
+  display: block;
+  width: 38px;
+  border-radius: 999px;
+  color: #102113;
+  font-size: 0.48rem;
+  font-weight: 800;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+.ndvi-scale-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  line-height: 1;
+  padding: 1px 5px;
+}
+
+.ndvi-scale-tick {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.72);
+}
+
+.ndvi-summary-box {
+  position: absolute;
+  top: 22px;
+  left: calc(50% + 22px);
+  z-index: 510;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(36, 79, 38, 0.28);
+  border-radius: 10px;
+  background: rgba(248, 249, 245, 0.88);
+  color: #244F26;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 4px 14px rgba(36, 79, 38, 0.18);
 }
 </style>
