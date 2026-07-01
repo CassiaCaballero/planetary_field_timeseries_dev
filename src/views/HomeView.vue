@@ -410,6 +410,41 @@ const ndviSummary = ref<NdviFieldSummary | null>(null)
 const ndviSummaryLoading = ref(false)
 const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
+const NDVI_SCALE_COLORS = [
+  '#a50026',
+  '#b71126',
+  '#c82227',
+  '#d9342a',
+  '#e64a33',
+  '#f46d43',
+  '#fa8c59',
+  '#fdae61',
+  '#fec980',
+  '#fee08b',
+  '#ffffbf',
+  '#e6f598',
+  '#d9ef8b',
+  '#c5e67e',
+  '#a6d96a',
+  '#82c966',
+  '#66bd63',
+  '#41ab5d',
+  '#1a9850',
+  '#0b7d42',
+  '#006837',
+]
+const NDVI_SCALE_BACKGROUND = `linear-gradient(to right, ${NDVI_SCALE_COLORS.map((color, index) => {
+  const start = (index / NDVI_SCALE_COLORS.length) * 100
+  const end = ((index + 1) / NDVI_SCALE_COLORS.length) * 100
+  return `${color} ${start}% ${end}%`
+}).join(', ')})`
+const NDVI_SCALE_TICKS = NDVI_SCALE_COLORS.map((_, index) => {
+  const value = Number((-1 + index * 0.1).toFixed(1))
+  return {
+    label: value.toString(),
+    left: `${((index + 0.5) / NDVI_SCALE_COLORS.length) * 100}%`,
+  }
+})
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
 const sceneDates = computed(() =>
@@ -989,6 +1024,43 @@ function updatePreviewFieldMask() {
       fillOpacity: 0,
     },
   }).addTo(previewNdviMap)
+}
+
+function fieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
+  const polygons = field.geometry.type === 'Polygon' ? [field.geometry.coordinates] : field.geometry.coordinates
+  return polygons
+    .map(polygon => polygon[0]?.map(([lng, lat]) => [lat, lng] as L.LatLngExpression) ?? [])
+    .filter(ring => ring.length > 0)
+}
+
+function updatePreviewFieldMask() {
+  previewFieldMask?.remove()
+  previewFieldOutline?.remove()
+  previewFieldMask = null
+  previewFieldOutline = null
+
+  if (!previewMap || previewLayer.value !== 'NDVI' || !appStore.selectedField) return
+
+  const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
+  const cropRings = fieldExteriorRings(appStore.selectedField)
+  if (!cropRings.length) return
+
+  previewFieldMask = L.polygon([worldRing, ...cropRings], {
+    stroke: false,
+    fillColor: '#132033',
+    fillOpacity: 0.82,
+    fillRule: 'evenodd',
+    interactive: false,
+  }).addTo(previewMap)
+
+  previewFieldOutline = L.geoJSON(appStore.selectedField, {
+    interactive: false,
+    style: {
+      color: '#FFC145',
+      weight: 2,
+      fillOpacity: 0,
+    },
+  }).addTo(previewMap)
 }
 
 function centerPreviewMap(zoom = previewTileZoom.value) {
@@ -1772,7 +1844,7 @@ onUnmounted(() => {
 .image-skeleton {
   position: relative;
   width: 100%;
-  aspect-ratio: 2.4;
+  aspect-ratio: 2.7;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
