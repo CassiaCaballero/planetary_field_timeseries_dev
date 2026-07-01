@@ -989,7 +989,7 @@ function updatePreviewMarker() {
   previewNdviMarker?.setLatLng([lat, lon])
 }
 
-function fieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
+function selectedFieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
   const polygons = field.geometry.type === 'Polygon' ? [field.geometry.coordinates] : field.geometry.coordinates
   return polygons
     .map(polygon => polygon[0]?.map(([lng, lat]) => [lat, lng] as L.LatLngExpression) ?? [])
@@ -1005,7 +1005,7 @@ function updatePreviewFieldMask() {
   if (!previewNdviMap || !appStore.selectedField) return
 
   const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
-  const cropRings = fieldExteriorRings(appStore.selectedField)
+  const cropRings = selectedFieldExteriorRings(appStore.selectedField)
   if (!cropRings.length) return
 
   previewFieldMask = L.polygon([worldRing, ...cropRings], {
@@ -1024,43 +1024,6 @@ function updatePreviewFieldMask() {
       fillOpacity: 0,
     },
   }).addTo(previewNdviMap)
-}
-
-function fieldExteriorRings(field: FieldFeature): L.LatLngExpression[][] {
-  const polygons = field.geometry.type === 'Polygon' ? [field.geometry.coordinates] : field.geometry.coordinates
-  return polygons
-    .map(polygon => polygon[0]?.map(([lng, lat]) => [lat, lng] as L.LatLngExpression) ?? [])
-    .filter(ring => ring.length > 0)
-}
-
-function updatePreviewFieldMask() {
-  previewFieldMask?.remove()
-  previewFieldOutline?.remove()
-  previewFieldMask = null
-  previewFieldOutline = null
-
-  if (!previewMap || previewLayer.value !== 'NDVI' || !appStore.selectedField) return
-
-  const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
-  const cropRings = fieldExteriorRings(appStore.selectedField)
-  if (!cropRings.length) return
-
-  previewFieldMask = L.polygon([worldRing, ...cropRings], {
-    stroke: false,
-    fillColor: '#132033',
-    fillOpacity: 0.82,
-    fillRule: 'evenodd',
-    interactive: false,
-  }).addTo(previewMap)
-
-  previewFieldOutline = L.geoJSON(appStore.selectedField, {
-    interactive: false,
-    style: {
-      color: '#FFC145',
-      weight: 2,
-      fillOpacity: 0,
-    },
-  }).addTo(previewMap)
 }
 
 function centerPreviewMap(zoom = previewTileZoom.value) {
