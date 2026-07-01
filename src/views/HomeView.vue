@@ -1505,7 +1505,7 @@ onUnmounted(() => {
 
 .map-stage.inspector-open {
   grid-template-columns: minmax(0, 1fr) minmax(420px, 50vw);
-  grid-template-rows: minmax(0, 1fr) minmax(260px, 38vh);
+  grid-template-rows: minmax(220px, 1fr) 50vh;
   grid-template-areas:
     "map inspector"
     "imagery inspector";
@@ -1530,8 +1530,15 @@ onUnmounted(() => {
 
 .imagery-dock-scroll {
   height: 100%;
-  overflow-y: auto;
+  overflow: visible;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.imagery-dock .panel-card {
+  margin-bottom: 0;
 }
 
 :deep(.tp-marker span) {
@@ -1573,7 +1580,7 @@ onUnmounted(() => {
 }
 
 .map-stage.inspector-open .basemap-switcher {
-  bottom: calc(38vh + 42px);
+  bottom: calc(50vh + 42px);
 }
 
 .basemap-switcher button {
@@ -1734,7 +1741,7 @@ onUnmounted(() => {
 .image-skeleton {
   position: relative;
   width: 100%;
-  aspect-ratio: 2.4;
+  aspect-ratio: 2.7;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
