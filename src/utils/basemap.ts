@@ -1,4 +1,4 @@
-export type BasemapId = 'satellite' | 'dark' | 'terrain'
+export type BasemapId = 'satellite' | 'dark'
 
 export interface BasemapDefinition {
   id: BasemapId
@@ -29,16 +29,6 @@ export const BASEMAPS: BasemapDefinition[] = [
     options: {
       maxZoom: 20,
       attribution: '(c) OpenStreetMap contributors (c) CARTO',
-    },
-  },
-  {
-    id: 'terrain',
-    label: 'Terrain',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
-    labelUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    options: {
-      maxZoom: 13,
-      attribution: 'Tiles (c) Esri',
     },
   },
 ]
