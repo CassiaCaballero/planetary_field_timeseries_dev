@@ -233,6 +233,16 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
       params.set('rescale', '0,255')
       params.set('colormap', JSON.stringify(NDVI_TITILER_COLORMAP))
       break
+    case 'SCL_CLOUD_MASK':
+      params.append('assets', 'SCL')
+      params.set('asset_as_band', 'true')
+      params.set('expression', 'where((SCL==3) | (SCL==7) | (SCL==8) | (SCL==9) | (SCL==10) | (SCL==11), 1, 0)')
+      params.set('rescale', '0,1')
+      params.set('colormap', JSON.stringify({
+        0: [0, 0, 0, 0],
+        1: [232, 232, 232, 255],
+      }))
+      break
     case 'NDWI':
       params.append('assets', 'B03')
       params.append('assets', 'B08')

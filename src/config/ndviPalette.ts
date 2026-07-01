@@ -28,6 +28,12 @@ export const NDVI_SCALE_BACKGROUND = `linear-gradient(to right, ${NDVI_PALETTE_C
   return `${color} ${start}% ${end}%`
 }).join(', ')})`
 
+export const NDVI_VERTICAL_SCALE_BACKGROUND = `linear-gradient(to top, ${NDVI_PALETTE_COLORS.map((color, index) => {
+  const start = (index / NDVI_PALETTE_COLORS.length) * 100
+  const end = ((index + 1) / NDVI_PALETTE_COLORS.length) * 100
+  return `${color} ${start}% ${end}%`
+}).join(', ')})`
+
 export const NDVI_SCALE_TICKS = NDVI_PALETTE_COLORS.map((_, index) => {
   const value = Number((-1 + index * 0.1).toFixed(1))
   return {
