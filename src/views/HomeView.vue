@@ -200,6 +200,7 @@
                   aria-label="Sentinel-2 preview for the selected location"
                 ></div>
                 <div v-if="previewLayer === 'NDVI' && appStore.selectedField" class="ndvi-summary-box">
+                  <span>Image date: {{ selectedSceneDate || '—' }}</span>
                   <template v-if="ndviSummary">
                     <span>NDVI avg: {{ ndviSummary.mean.toFixed(2) }}</span>
                     <span>std: {{ ndviSummary.stddev.toFixed(2) }}</span>
@@ -207,6 +208,12 @@
                   <template v-else>
                     <span>{{ ndviSummaryLoading ? 'Loading NDVI stats…' : 'NDVI stats unavailable' }}</span>
                   </template>
+                  <span
+                    v-for="item in climateMeanSummaries"
+                    :key="item.id"
+                  >
+                    {{ item.label }} avg: {{ item.value }}
+                  </span>
                 </div>
                 <div class="img-zoom-controls">
                   <button @click.stop="zoomImageIn"    title="Zoom in (fetch closer tile)">＋</button>
@@ -264,8 +271,8 @@
               :flags="emptyFlags"
               :flag-labels="emptyFlagLabels"
               :selected-date="appStore.selectedDate"
-              :y-min="-1"
-              :y-max="1"
+              :y-min="null"
+              :y-max="null"
               unit="NDVI"
               class="mini-chart"
               @point-click="onChartPointClick"
@@ -295,8 +302,8 @@
                 :flags="emptyFlags"
                 :flag-labels="emptyFlagLabels"
                 :selected-date="appStore.selectedDate"
-                :y-min="layer.yMin"
-                :y-max="layer.yMax"
+                :y-min="null"
+                :y-max="null"
                 :unit="layer.unit"
                 :color="currentPaletteColor(layer)"
                 :chart-type="layer.chartType"
@@ -599,6 +606,25 @@ function climateStats(layerId: string): { min: string; avg: string; max: string 
   const avg = values.reduce((a, b) => a + b, 0) / values.length
   return { min: min.toFixed(1), avg: avg.toFixed(1), max: max.toFixed(1) }
 }
+
+const CLIMATE_SUMMARY_LABELS: Record<string, string> = {
+  temperature: 'Temp',
+  precipitation: 'Precip',
+  et0: 'ET₀',
+}
+
+const climateMeanSummaries = computed(() =>
+  CLIMATE_LAYERS.map(layer => {
+    const stats = climateStats(layer.id)
+    return stats
+      ? {
+          id: layer.id,
+          label: CLIMATE_SUMMARY_LABELS[layer.id] ?? layer.label,
+          value: `${stats.avg} ${layer.unit}`,
+        }
+      : null
+  }).filter((item): item is { id: string; label: string; value: string } => item !== null),
+)
 
 // Needle position (0–100%) on the gradient bar
 function climateNeedlePos(layer: ClimateLayer): number {
