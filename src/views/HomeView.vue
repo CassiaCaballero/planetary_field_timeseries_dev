@@ -860,17 +860,8 @@ function isDesktopInspector() {
   return window.matchMedia('(min-width: 861px)').matches
 }
 
-function visibleBasemapCenterFor(lon: number, lat: number, zoom: number): L.LatLngExpression {
-  if (!map || !inspectorOpen.value || !isDesktopInspector()) return [lat, lon]
-
-  const size = map.getSize()
-  const inspectorWidth = inspectorEl.value?.getBoundingClientRect().width ?? size.x / 2
-  const visibleWidth = Math.max(1, size.x - inspectorWidth)
-  const desiredPoint = L.point(visibleWidth / 2, size.y / 2)
-  const containerCenter = L.point(size.x / 2, size.y / 2)
-  const selectedPoint = map.project([lat, lon], zoom)
-  const targetCenterPoint = selectedPoint.add(containerCenter.subtract(desiredPoint))
-  return map.unproject(targetCenterPoint, zoom)
+function visibleBasemapCenterFor(lon: number, lat: number, _zoom: number): L.LatLngExpression {
+  return [lat, lon]
 }
 
 function centerMainMapOnPoint(lon: number, lat: number, zoom = map?.getZoom() ?? 12, animate = true) {
@@ -896,13 +887,16 @@ function setSelectedPoint(lon: number, lat: number, name = 'Selected location', 
   for (const id of activeClimateIds.value) fetchClimate(id)
 }
 
-function selectFieldFeature(field: FieldFeature, fitField = true) {
+async function selectFieldFeature(field: FieldFeature, fitField = true) {
   const layer = L.geoJSON(field)
   const bounds = layer.getBounds()
   layer.remove()
   const center = bounds.getCenter()
   setSelectedPoint(center.lng, center.lat, `Field ${field.properties.fieldId}`, field)
-  if (fitField) centerMainMapOnPoint(center.lng, center.lat, 16)
+  if (!fitField) return
+  await nextTick()
+  map?.invalidateSize()
+  centerMainMapOnPoint(center.lng, center.lat, 16, false)
 }
 
 async function ensurePreviewMap() {
