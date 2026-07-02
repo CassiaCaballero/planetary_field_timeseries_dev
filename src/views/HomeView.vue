@@ -1898,8 +1898,9 @@ onUnmounted(() => {
 
 .preview-side-panel {
   position: relative;
-  display: grid;
-  grid-template-rows: minmax(0, auto) minmax(150px, 1fr);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
   padding: 4px;
@@ -2418,7 +2419,7 @@ onUnmounted(() => {
 .ndvi-scale-title {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 43%;
   transform: translate(-50%, -50%) rotate(-90deg);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
