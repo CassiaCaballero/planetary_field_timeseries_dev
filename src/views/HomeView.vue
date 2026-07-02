@@ -199,22 +199,35 @@
                       aria-label="Sentinel-2 NDVI preview for the selected location"
                     ></div>
                   </div>
-                </div>
-                <div v-if="appStore.selectedField" class="ndvi-summary-box">
-                  <span>Image date: {{ selectedSceneDate || '—' }}</span>
-                  <template v-if="ndviSummary">
-                    <span>NDVI avg: {{ ndviSummary.mean.toFixed(2) }}</span>
-                    <span>std: {{ ndviSummary.stddev.toFixed(2) }}</span>
-                  </template>
-                  <template v-else>
-                    <span>{{ ndviSummaryLoading ? 'Loading NDVI stats…' : 'NDVI stats unavailable' }}</span>
-                  </template>
-                  <span
-                    v-for="item in climateMeanSummaries"
-                    :key="item.id"
-                  >
-                    {{ item.label }} avg: {{ item.value }}
-                  </span>
+                  <aside class="preview-side-panel">
+                    <div v-if="appStore.selectedField" class="ndvi-summary-box">
+                      <span>Image date: {{ selectedSceneDate || '—' }}</span>
+                      <template v-if="ndviSummary">
+                        <span>NDVI avg: {{ ndviSummary.mean.toFixed(2) }}</span>
+                        <span>std: {{ ndviSummary.stddev.toFixed(2) }}</span>
+                      </template>
+                      <template v-else>
+                        <span>{{ ndviSummaryLoading ? 'Loading NDVI stats…' : 'NDVI stats unavailable' }}</span>
+                      </template>
+                      <span
+                        v-for="item in climateMeanSummaries"
+                        :key="item.id"
+                      >
+                        {{ item.label }} avg: {{ item.value }}
+                      </span>
+                    </div>
+                    <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
+                      <span
+                        v-for="tick in NDVI_SCALE_TICKS"
+                        :key="tick.label"
+                        class="ndvi-scale-tick"
+                        :style="{ bottom: tick.left }"
+                      >
+                        {{ tick.label }}
+                      </span>
+                      <span class="ndvi-scale-title">NDVI</span>
+                    </div>
+                  </aside>
                 </div>
                 <div class="img-zoom-controls">
                   <button @click.stop="zoomImageIn"    title="Zoom in (fetch closer tile)">＋</button>
@@ -674,8 +687,10 @@ let previewRgbTileLayer: L.TileLayer | null = null
 let previewNdviTileLayer: L.TileLayer | null = null
 let previewRgbCloudLayer: L.TileLayer | null = null
 let previewNdviCloudLayer: L.TileLayer | null = null
-let previewFieldMask: L.Polygon | null = null
-let previewFieldOutline: L.GeoJSON | null = null
+let previewRgbFieldMask: L.Polygon | null = null
+let previewRgbFieldOutline: L.GeoJSON | null = null
+let previewNdviFieldMask: L.Polygon | null = null
+let previewNdviFieldOutline: L.GeoJSON | null = null
 let previewRgbMarker: L.Marker | null = null
 let previewNdviMarker: L.Marker | null = null
 let previewResizeObserver: ResizeObserver | null = null
@@ -999,18 +1014,39 @@ function selectedFieldExteriorRings(field: FieldFeature): L.LatLngExpression[][]
 }
 
 function updatePreviewFieldMask() {
-  previewFieldMask?.remove()
-  previewFieldOutline?.remove()
-  previewFieldMask = null
-  previewFieldOutline = null
+  previewRgbFieldMask?.remove()
+  previewRgbFieldOutline?.remove()
+  previewNdviFieldMask?.remove()
+  previewNdviFieldOutline?.remove()
+  previewRgbFieldMask = null
+  previewRgbFieldOutline = null
+  previewNdviFieldMask = null
+  previewNdviFieldOutline = null
 
-  if (!previewNdviMap || !appStore.selectedField) return
+  if (!previewRgbMap || !previewNdviMap || !appStore.selectedField) return
 
   const worldRing: L.LatLngExpression[] = [[-90, -360], [-90, 360], [90, 360], [90, -360]]
   const cropRings = selectedFieldExteriorRings(appStore.selectedField)
   if (!cropRings.length) return
 
-  previewFieldMask = L.polygon([worldRing, ...cropRings], {
+  previewRgbFieldMask = L.polygon([worldRing, ...cropRings], {
+    stroke: false,
+    fillColor: '#132033',
+    fillOpacity: 0.34,
+    fillRule: 'evenodd',
+    interactive: false,
+  }).addTo(previewRgbMap)
+
+  previewRgbFieldOutline = L.geoJSON(appStore.selectedField, {
+    interactive: false,
+    style: {
+      color: '#FFC145',
+      weight: 2,
+      fillOpacity: 0,
+    },
+  }).addTo(previewRgbMap)
+
+  previewNdviFieldMask = L.polygon([worldRing, ...cropRings], {
     stroke: false,
     fillColor: '#132033',
     fillOpacity: 0.82,
@@ -1018,7 +1054,7 @@ function updatePreviewFieldMask() {
     interactive: false,
   }).addTo(previewNdviMap)
 
-  previewFieldOutline = L.geoJSON(appStore.selectedField, {
+  previewNdviFieldOutline = L.geoJSON(appStore.selectedField, {
     interactive: false,
     style: {
       color: '#FFC145',
@@ -1099,8 +1135,10 @@ function destroyPreviewMap() {
   previewNdviTileLayer = null
   previewRgbCloudLayer = null
   previewNdviCloudLayer = null
-  previewFieldMask = null
-  previewFieldOutline = null
+  previewRgbFieldMask = null
+  previewRgbFieldOutline = null
+  previewNdviFieldMask = null
+  previewNdviFieldOutline = null
   previewRgbMarker = null
   previewNdviMarker = null
 }
@@ -1581,7 +1619,7 @@ onUnmounted(() => {
 }
 
 .map-stage.inspector-open {
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 50vw);
+  grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
   grid-template-rows: minmax(220px, 1fr) 50vh;
   grid-template-areas:
     "map inspector"
@@ -1683,7 +1721,7 @@ onUnmounted(() => {
   z-index: 900;
   display: flex;
   flex-direction: column;
-  width: 50vw;
+  width: 40vw;
   height: 100%;
   background: var(--bg-panel);
   backdrop-filter: blur(16px);
@@ -1830,7 +1868,7 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 126px;
   gap: 6px;
   padding: 6px;
 }
@@ -1856,6 +1894,18 @@ onUnmounted(() => {
   letter-spacing: 0.08em;
   padding: 3px 7px;
   text-transform: uppercase;
+}
+
+.preview-side-panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, auto) minmax(150px, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: rgba(248, 249, 245, 0.72);
 }
 
 .preview-map {
@@ -2343,13 +2393,11 @@ onUnmounted(() => {
 
 <style scoped>
 .ndvi-scale {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  bottom: 14px;
-  z-index: 500;
-  display: block;
+  position: relative;
+  justify-self: center;
   width: 38px;
+  height: 100%;
+  min-height: 150px;
   border-radius: 999px;
   color: #102113;
   font-size: 0.48rem;
@@ -2378,9 +2426,7 @@ onUnmounted(() => {
 }
 
 .ndvi-summary-box {
-  position: absolute;
-  top: 22px;
-  left: calc(50% + 22px);
+  position: relative;
   z-index: 510;
   display: flex;
   flex-direction: column;
@@ -2390,7 +2436,7 @@ onUnmounted(() => {
   border-radius: 10px;
   background: rgba(248, 249, 245, 0.88);
   color: #244F26;
-  font-size: 0.86rem;
+  font-size: 0.76rem;
   font-weight: 800;
   line-height: 1.2;
   box-shadow: 0 4px 14px rgba(36, 79, 38, 0.18);
