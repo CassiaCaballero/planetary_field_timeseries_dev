@@ -198,6 +198,17 @@
                       class="preview-map"
                       aria-label="Sentinel-2 NDVI preview for the selected location"
                     ></div>
+                    <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
+                      <span
+                        v-for="tick in NDVI_SCALE_TICKS"
+                        :key="tick.label"
+                        class="ndvi-scale-tick"
+                        :style="{ bottom: tick.left }"
+                      >
+                        {{ tick.label }}
+                      </span>
+                      <span class="ndvi-scale-title">NDVI</span>
+                    </div>
                   </div>
                   <aside class="preview-side-panel">
                     <div v-if="appStore.selectedField" class="ndvi-summary-box">
@@ -215,17 +226,6 @@
                       >
                         {{ item.label }} avg: {{ item.value }}
                       </span>
-                    </div>
-                    <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
-                      <span
-                        v-for="tick in NDVI_SCALE_TICKS"
-                        :key="tick.label"
-                        class="ndvi-scale-tick"
-                        :style="{ bottom: tick.left }"
-                      >
-                        {{ tick.label }}
-                      </span>
-                      <span class="ndvi-scale-title">NDVI</span>
                     </div>
                   </aside>
                 </div>
@@ -2393,11 +2393,12 @@ onUnmounted(() => {
 
 <style scoped>
 .ndvi-scale {
-  position: relative;
-  justify-self: center;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 520;
   width: 38px;
-  height: 100%;
-  min-height: 150px;
   border-radius: 999px;
   color: #102113;
   font-size: 0.48rem;
