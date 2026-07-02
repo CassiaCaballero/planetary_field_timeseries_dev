@@ -198,7 +198,7 @@
                       class="preview-map"
                       aria-label="Sentinel-2 NDVI preview for the selected location"
                     ></div>
-                    <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
+                    <div class="ndvi-scale ndvi-scale--preview" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
                       <span
                         v-for="tick in NDVI_SCALE_TICKS"
                         :key="tick.label"
@@ -2397,11 +2397,16 @@ onUnmounted(() => {
 
 <style scoped>
 .ndvi-scale {
+  display: none;
+}
+
+.ndvi-scale--preview {
   position: absolute;
   top: 14px;
   right: 14px;
   bottom: 14px;
   z-index: 520;
+  display: block;
   width: 38px;
   border-radius: 999px;
   color: #102113;
