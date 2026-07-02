@@ -1,4 +1,5 @@
 import type { BandTimeSeries, RawBands } from '../types/api'
+import { NDVI_TITILER_COLORMAP } from '../config/ndviPalette'
 
 const PC_STAC_BASE = import.meta.env.VITE_PC_STAC_BASE || 'https://planetarycomputer.microsoft.com/api/stac/v1'
 const PC_TILER_BASE = import.meta.env.VITE_PC_TILER_BASE || 'https://planetarycomputer.microsoft.com/api/data/v1'
@@ -228,15 +229,33 @@ function applyLayerParams(params: URLSearchParams, layerId: string) {
       params.append('assets', 'B08')
       params.append('assets', 'B04')
       params.set('asset_as_band', 'true')
-      params.set('expression', '(B08_b1-B04_b1)/(B08_b1+B04_b1)')
-      params.set('rescale', '-1,1')
-      params.set('colormap_name', 'rdylgn')
+      params.set('expression', 'floor(floor(((((B08*1.0)-B04)/((B08*1.0)+B04))+1)*10)*12.75)')
+      params.set('rescale', '0,255')
+      params.set('colormap', JSON.stringify(NDVI_TITILER_COLORMAP))
+      break
+    case 'SCL_CLOUD_MASK':
+      params.append('assets', 'SCL')
+      params.set('asset_as_band', 'true')
+      params.set('colormap', JSON.stringify({
+        0: [0, 0, 0, 0],
+        1: [0, 0, 0, 0],
+        2: [0, 0, 0, 0],
+        3: [232, 232, 232, 255],
+        4: [0, 0, 0, 0],
+        5: [0, 0, 0, 0],
+        6: [0, 0, 0, 0],
+        7: [232, 232, 232, 255],
+        8: [232, 232, 232, 255],
+        9: [232, 232, 232, 255],
+        10: [232, 232, 232, 255],
+        11: [232, 232, 232, 255],
+      }))
       break
     case 'NDWI':
       params.append('assets', 'B03')
       params.append('assets', 'B08')
       params.set('asset_as_band', 'true')
-      params.set('expression', '(B03_b1-B08_b1)/(B03_b1+B08_b1)')
+      params.set('expression', '(B03-B08)/(B03+B08)')
       params.set('rescale', '-1,1')
       params.set('colormap_name', 'rdbu_r')
       break
