@@ -191,7 +191,7 @@
                       aria-label="Sentinel-2 true color preview for the selected location"
                     ></div>
                   </div>
-                  <div class="preview-pane">
+                  <div class="preview-pane preview-ndvi-pane">
                     <span class="preview-pane-label">NDVI</span>
                     <div
                       ref="previewNdviMapEl"
@@ -1906,6 +1906,10 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius-sm) - 2px);
   background: rgba(248, 249, 245, 0.72);
+}
+
+.preview-side-panel .ndvi-scale {
+  display: none;
 }
 
 .preview-map {
