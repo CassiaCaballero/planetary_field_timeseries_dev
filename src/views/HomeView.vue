@@ -234,6 +234,17 @@
                   <button @click.stop="zoomImageReset" title="Reset zoom">⊡</button>
                   <button @click.stop="zoomImageOut"   title="Zoom out (fetch wider tile)">－</button>
                 </div>
+                <div class="ndvi-scale" :style="{ background: NDVI_VERTICAL_SCALE_BACKGROUND }">
+                  <span
+                    v-for="tick in NDVI_SCALE_TICKS"
+                    :key="tick.label"
+                    class="ndvi-scale-tick"
+                    :style="{ bottom: tick.left }"
+                  >
+                    {{ tick.label }}
+                  </span>
+                  <span class="ndvi-scale-title">NDVI</span>
+                </div>
                 <span class="caption mono">{{ selectedSceneDate }} · cloud {{ selectedSceneCloud }}</span>
               </div>
               <p v-else class="empty">No Sentinel-2 scenes found in this date range.</p>
@@ -412,6 +423,41 @@ const ndviSummary = ref<NdviFieldSummary | null>(null)
 const ndviSummaryLoading = ref(false)
 const PREVIEW_DEFAULT_ZOOM = 17
 const previewTileZoom = ref(PREVIEW_DEFAULT_ZOOM)
+const NDVI_SCALE_COLORS = [
+  '#a50026',
+  '#b71126',
+  '#c82227',
+  '#d9342a',
+  '#e64a33',
+  '#f46d43',
+  '#fa8c59',
+  '#fdae61',
+  '#fec980',
+  '#fee08b',
+  '#ffffbf',
+  '#e6f598',
+  '#d9ef8b',
+  '#c5e67e',
+  '#a6d96a',
+  '#82c966',
+  '#66bd63',
+  '#41ab5d',
+  '#1a9850',
+  '#0b7d42',
+  '#006837',
+]
+const NDVI_SCALE_BACKGROUND = `linear-gradient(to right, ${NDVI_SCALE_COLORS.map((color, index) => {
+  const start = (index / NDVI_SCALE_COLORS.length) * 100
+  const end = ((index + 1) / NDVI_SCALE_COLORS.length) * 100
+  return `${color} ${start}% ${end}%`
+}).join(', ')})`
+const NDVI_SCALE_TICKS = NDVI_SCALE_COLORS.map((_, index) => {
+  const value = Number((-1 + index * 0.1).toFixed(1))
+  return {
+    label: value.toString(),
+    left: `${((index + 0.5) / NDVI_SCALE_COLORS.length) * 100}%`,
+  }
+})
 
 // Scene dates derived from NDVI data — these are the exact dates shown in the chart
 const sceneDates = computed(() =>
@@ -1811,7 +1857,7 @@ onUnmounted(() => {
 .image-skeleton {
   position: relative;
   width: 100%;
-  aspect-ratio: 2.4;
+  aspect-ratio: 2.7;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
